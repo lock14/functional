@@ -2,7 +2,8 @@ package slices
 
 import "golang.org/x/exp/constraints"
 
-// Monad represents any type
+// Monad represents any type that can use the `+` operator and whose zero
+// value is the identity element the `+` operator
 type Monad interface {
 	constraints.Integer | constraints.Float | constraints.Complex | ~string
 }
