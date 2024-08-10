@@ -6,11 +6,8 @@ import (
 )
 
 func main() {
-	fmt.Println(
-		channels.ToSlice(
-			channels.Distinct(
-				channels.FromSlice([]int{1, 1, 2, 2, 3, 3, 4, 4}),
-			),
-		),
-	)
+	channel := channels.FromSlice([]int{1, 1, 2, 2, 3, 3, 4, 4})
+	distinct := channels.Distinct(channel)
+	slice := channels.ToSlice(distinct)
+	fmt.Println(slice)
 }

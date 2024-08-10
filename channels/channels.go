@@ -109,6 +109,25 @@ func FilterWithErr[T any](channel chan T, p func(T) (bool, error)) (chan T, chan
 	return filtered, errors
 }
 
+func ParallelFilter[T any](channel chan T, p func(T) bool) chan T {
+	filtered := make(chan T)
+	go func() {
+		waitGroup := sync.WaitGroup{}
+		for t := range channel {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				if p(t) {
+					filtered <- t
+				}
+			}()
+		}
+		waitGroup.Wait()
+		close(filtered)
+	}()
+	return filtered
+}
+
 func Sum[M Monad](numbers chan M) M {
 	var identity M
 	return Reduce(numbers, func(a, b M) M { return a + b }, identity)
