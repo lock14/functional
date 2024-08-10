@@ -10,4 +10,5 @@ func main() {
 	distinct := channels.Distinct(channel)
 	slice := channels.ToSlice(distinct)
 	fmt.Println(slice)
+	fmt.Println(channels.ToSlice(channels.Limit(channels.Generate(func() int { return 1 }), 10)))
 }

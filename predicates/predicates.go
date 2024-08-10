@@ -22,3 +22,11 @@ func Not[T any](p func(T) bool) func(T) bool {
 		return !p(t)
 	}
 }
+
+func True[T any](t T) bool {
+	return true
+}
+
+func False[T any](t T) bool {
+	return false
+}

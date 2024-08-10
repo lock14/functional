@@ -192,11 +192,21 @@ func ToSlice[T any](channel chan T) []T {
 	return slice
 }
 
-func Iterate[T constraints.Integer](start, end T) chan T {
+func Generate[T any](supplier func() T) chan T {
 	c := make(chan T)
 	go func() {
-		for i := start; i < end; i++ {
-			c <- i
+		for {
+			c <- supplier()
+		}
+	}()
+	return c
+}
+
+func Iterate[T any](seed T, hasNext func(T) bool, next func(T) T) chan T {
+	c := make(chan T)
+	go func() {
+		for cur := seed; hasNext(cur); cur = next(cur) {
+			c <- cur
 		}
 		close(c)
 	}()
@@ -204,13 +214,46 @@ func Iterate[T constraints.Integer](start, end T) chan T {
 }
 
 func Range[T constraints.Integer](end T) chan T {
+	var start T
+	return Iterate(start, func(t T) bool { return t < end }, func(t T) T { t++; return t })
+}
+
+func Limit[T any](channel chan T, max int64) chan T {
 	c := make(chan T)
 	go func() {
-		var start T
-		for i := start; i < end; i++ {
-			c <- i
+		count := int64(0)
+		for t := range channel {
+			if count < max {
+				c <- t
+				count++
+			} else {
+				break
+			}
 		}
 		close(c)
 	}()
 	return c
+}
+
+func Skip[T any](channel chan T, n int64) chan T {
+	c := make(chan T)
+	go func() {
+		count := int64(0)
+		for t := range channel {
+			if count >= n {
+				c <- t
+			}
+			count++
+		}
+		close(c)
+	}()
+	return c
+}
+
+func AllMatch[T any](channel chan T, p func(T) bool) bool {
+	return Reduce(Map(channel, p), func(t1, t2 bool) bool { return t1 && t2 }, true)
+}
+
+func AnyMatch[T any](channel chan T, p func(T) bool) bool {
+	return Reduce(Map(channel, p), func(t1, t2 bool) bool { return t1 || t2 }, false)
 }
