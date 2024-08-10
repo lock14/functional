@@ -1,6 +1,10 @@
 package channels
 
-import "golang.org/x/exp/constraints"
+import (
+	"golang.org/x/exp/constraints"
+	"sort"
+	"sync"
+)
 
 // Monad represents any type that can use the `+` operator and whose zero
 // value is the identity element the `+` operator
@@ -14,6 +18,41 @@ func Map[T any, U any](channel chan T, f func(T) U) chan U {
 		for t := range channel {
 			mapped <- f(t)
 		}
+		close(mapped)
+	}()
+	return mapped
+}
+
+func MapWithErr[T any, U any](channel chan T, f func(T) (U, error)) (chan U, chan error) {
+	mapped := make(chan U)
+	errors := make(chan error)
+	go func() {
+		for t := range channel {
+			u, err := f(t)
+			if err != nil {
+				errors <- err
+			} else {
+				mapped <- u
+			}
+		}
+		close(mapped)
+		close(errors)
+	}()
+	return mapped, errors
+}
+
+func ParallelMap[T any, U any](channel chan T, f func(T) U) chan U {
+	mapped := make(chan U)
+	go func() {
+		waitGroup := sync.WaitGroup{}
+		for t := range channel {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				mapped <- f(t)
+			}()
+		}
+		waitGroup.Wait()
 		close(mapped)
 	}()
 	return mapped
@@ -52,9 +91,79 @@ func Filter[T any](channel chan T, p func(T) bool) chan T {
 	return filtered
 }
 
+func FilterWithErr[T any](channel chan T, p func(T) (bool, error)) (chan T, chan error) {
+	filtered := make(chan T)
+	errors := make(chan error)
+	go func() {
+		for t := range channel {
+			ok, err := p(t)
+			if err != nil {
+				errors <- err
+			} else if ok {
+				filtered <- t
+			}
+		}
+		close(filtered)
+		close(errors)
+	}()
+	return filtered, errors
+}
+
 func Sum[M Monad](numbers chan M) M {
 	var identity M
 	return Reduce(numbers, func(a, b M) M { return a + b }, identity)
+}
+
+func Sorted[T constraints.Ordered](channel chan T) chan T {
+	ordered := make(chan T)
+	go func() {
+		var buf []T
+		for t := range channel {
+			buf = append(buf, t)
+		}
+		sort.Slice(buf, func(i, j int) bool {
+			return buf[i] < buf[j]
+		})
+		for _, t := range buf {
+			ordered <- t
+		}
+		close(ordered)
+	}()
+	return ordered
+}
+
+func Distinct[T comparable](channel chan T) chan T {
+	distinct := make(chan T)
+	go func() {
+		set := make(map[T]struct{})
+		for t := range channel {
+			if _, ok := set[t]; !ok {
+				set[t] = struct{}{}
+				distinct <- t
+			}
+		}
+		close(distinct)
+	}()
+	return distinct
+}
+
+func FromSlice[T any](slice []T) chan T {
+	channel := make(chan T)
+	go func() {
+		for _, t := range slice {
+			channel <- t
+		}
+		close(channel)
+	}()
+	return channel
+}
+
+func ToSlice[T any](channel chan T) []T {
+	var slice []T
+	for t := range channel {
+		slice = append(slice, t)
+	}
+	return slice
 }
 
 func Iterate[T constraints.Integer](start, end T) chan T {
