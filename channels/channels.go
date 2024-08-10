@@ -1,6 +1,7 @@
 package channels
 
 import (
+	"errors"
 	"golang.org/x/exp/constraints"
 	"sort"
 	"sync"
@@ -25,20 +26,20 @@ func Map[T any, U any](channel chan T, f func(T) U) chan U {
 
 func MapWithErr[T any, U any](channel chan T, f func(T) (U, error)) (chan U, chan error) {
 	mapped := make(chan U)
-	errors := make(chan error)
+	errs := make(chan error)
 	go func() {
 		for t := range channel {
 			u, err := f(t)
 			if err != nil {
-				errors <- err
+				errs <- err
 			} else {
 				mapped <- u
 			}
 		}
 		close(mapped)
-		close(errors)
+		close(errs)
 	}()
-	return mapped, errors
+	return mapped, errs
 }
 
 func ParallelMap[T any, U any](channel chan T, f func(T) U) chan U {
@@ -93,20 +94,20 @@ func Filter[T any](channel chan T, p func(T) bool) chan T {
 
 func FilterWithErr[T any](channel chan T, p func(T) (bool, error)) (chan T, chan error) {
 	filtered := make(chan T)
-	errors := make(chan error)
+	errs := make(chan error)
 	go func() {
 		for t := range channel {
 			ok, err := p(t)
 			if err != nil {
-				errors <- err
+				errs <- err
 			} else if ok {
 				filtered <- t
 			}
 		}
 		close(filtered)
-		close(errors)
+		close(errs)
 	}()
-	return filtered, errors
+	return filtered, errs
 }
 
 func ParallelFilter[T any](channel chan T, p func(T) bool) chan T {
@@ -131,6 +132,12 @@ func ParallelFilter[T any](channel chan T, p func(T) bool) chan T {
 func Sum[M Monad](numbers chan M) M {
 	var identity M
 	return Reduce(numbers, func(a, b M) M { return a + b }, identity)
+}
+
+func JoinErrs(errs chan error) error {
+	return Reduce(errs, func(e1, e2 error) error {
+		return errors.Join(e1, e2)
+	}, nil)
 }
 
 func Sorted[T constraints.Ordered](channel chan T) chan T {
