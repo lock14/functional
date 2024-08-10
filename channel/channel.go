@@ -1,4 +1,4 @@
-package channels
+package channel
 
 import (
 	"errors"
@@ -57,6 +57,22 @@ func ParallelMap[T any, U any](channel chan T, f func(T) U) chan U {
 		close(mapped)
 	}()
 	return mapped
+}
+
+func Flatten[T any](channel chan chan T) chan T {
+	flat := make(chan T)
+	go func() {
+		for c := range channel {
+			for t := range c {
+				flat <- t
+			}
+		}
+	}()
+	return flat
+}
+
+func FlatMap[T, U any](channel chan T, f func(T) chan U) chan U {
+	return Flatten(Map(channel, f))
 }
 
 func FoldLeft[T any, U any](channel chan T, f func(u U, t T) U, u U) U {
@@ -135,9 +151,7 @@ func Sum[M Monad](numbers chan M) M {
 }
 
 func JoinErrs(errs chan error) error {
-	return Reduce(errs, func(e1, e2 error) error {
-		return errors.Join(e1, e2)
-	}, nil)
+	return Reduce(errs, func(e1, e2 error) error { return errors.Join(e1, e2) }, nil)
 }
 
 func Sorted[T constraints.Ordered](channel chan T) chan T {
@@ -256,4 +270,65 @@ func AllMatch[T any](channel chan T, p func(T) bool) bool {
 
 func AnyMatch[T any](channel chan T, p func(T) bool) bool {
 	return Reduce(Map(channel, p), func(t1, t2 bool) bool { return t1 || t2 }, false)
+}
+
+func TakeWhile[T any](chanel chan T, p func(T) bool) chan T {
+	c := make(chan T)
+	go func() {
+		for t := range chanel {
+			if p(t) {
+				c <- t
+			} else {
+				break
+			}
+		}
+		close(c)
+	}()
+	return c
+}
+
+func Count[T any](channel chan T) int64 {
+	return Sum(Map(channel, func(t T) int64 { return 1 }))
+}
+
+func Concat[T any](chan1, chan2 chan T) chan T {
+	c := make(chan T)
+	go func() {
+		for t := range chan1 {
+			c <- t
+		}
+		for t := range chan2 {
+			c <- t
+		}
+		close(c)
+	}()
+	return c
+}
+
+func Peek[T any](channel chan T, consumer func(T)) chan T {
+	c := make(chan T)
+	go func() {
+		for t := range channel {
+			consumer(t)
+		}
+		close(c)
+	}()
+	return c
+}
+
+func ForEach[T any](channel chan T, consumer func(T)) {
+	for t := range channel {
+		consumer(t)
+	}
+}
+
+func Of[T any](ts ...T) chan T {
+	c := make(chan T)
+	go func() {
+		for _, t := range ts {
+			c <- t
+		}
+		close(c)
+	}()
+	return c
 }

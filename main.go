@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/lock14/functional/channels"
+	"github.com/lock14/functional/channel"
 )
 
 func main() {
-	channel := channels.FromSlice([]int{1, 1, 2, 2, 3, 3, 4, 4})
-	distinct := channels.Distinct(channel)
-	slice := channels.ToSlice(distinct)
+	items := channel.FromSlice([]int{1, 1, 2, 2, 3, 3, 4, 4})
+	distinct := channel.Distinct(items)
+	slice := channel.ToSlice(distinct)
 	fmt.Println(slice)
-	fmt.Println(channels.ToSlice(channels.Limit(channels.Generate(func() int { return 1 }), 10)))
+	fmt.Println(channel.ToSlice(channel.Limit(channel.Generate(func() int { return 1 }), 10)))
 }
