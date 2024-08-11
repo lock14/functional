@@ -12,4 +12,7 @@ func main() {
 	fmt.Println(slice)
 	fmt.Println(channel.ToSlice(channel.Limit(channel.Generate(func() int { return 1 }), 10)))
 	fmt.Println(channel.ToSlice(channel.Of(1, 2, 3)))
+	fmt.Println(channel.ToSlice(channel.Zip(channel.Of(1, 2, 3), channel.Of("bob", "mary"))))
+	fmt.Println(channel.Join(channel.Of("[", "]"), channel.Join(channel.Of("bob", "mary", "jain"), ", ")))
+	fmt.Println(channel.Join(channel.Of("bob"), ", "))
 }

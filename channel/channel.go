@@ -12,7 +12,7 @@ type Monad interface {
 	constraints.Integer | constraints.Float | constraints.Complex | ~string
 }
 
-func Map[T any, U any](channel chan T, f func(T) U) chan U {
+func Map[T, U any](channel chan T, f func(T) U) chan U {
 	mapped := make(chan U)
 	go func() {
 		for t := range channel {
@@ -23,11 +23,11 @@ func Map[T any, U any](channel chan T, f func(T) U) chan U {
 	return mapped
 }
 
-func Flatten[T any](channel chan chan T) chan T {
+func Flatten[T any](channels chan chan T) chan T {
 	flat := make(chan T)
 	go func() {
-		for c := range channel {
-			for t := range c {
+		for channel := range channels {
+			for t := range channel {
 				flat <- t
 			}
 		}
@@ -40,7 +40,7 @@ func FlatMap[T, U any](channel chan T, f func(T) chan U) chan U {
 	return Flatten(Map(channel, f))
 }
 
-func FoldLeft[T any, U any](channel chan T, f func(u U, t T) U, u U) U {
+func FoldLeft[T, U any](channel chan T, f func(u U, t T) U, u U) U {
 	result := u
 	for t := range channel {
 		result = f(result, t)
@@ -48,7 +48,7 @@ func FoldLeft[T any, U any](channel chan T, f func(u U, t T) U, u U) U {
 	return result
 }
 
-func FoldRight[T any, U any](channel chan T, f func(t T, u U) U, u U) U {
+func FoldRight[T, U any](channel chan T, f func(t T, u U) U, u U) U {
 	result := u
 	for t := range channel {
 		result = f(t, FoldRight[T, U](channel, f, u))
@@ -73,13 +73,55 @@ func Filter[T any](channel chan T, p func(T) bool) chan T {
 	return filtered
 }
 
-func Sum[M Monad](numbers chan M) M {
+func Sum[M Monad](elements chan M) M {
 	var identity M
-	return Reduce(numbers, func(a, b M) M { return a + b }, identity)
+	return Reduce(elements, func(a, b M) M { return a + b }, identity)
 }
 
 func JoinErrs(errs chan error) error {
 	return Reduce(errs, func(e1, e2 error) error { return errors.Join(e1, e2) }, nil)
+}
+
+func Join[T ~string](strings chan T, sep T) T {
+	first, ok := <-strings
+	if !ok {
+		return first
+	}
+	return first + Reduce(strings, func(a, b T) T { return a + sep + b }, "")
+}
+
+type Pair[T1, T2 any] struct {
+	fst T1
+	snd T2
+}
+
+func Zip[T, U any](chan1 chan T, chan2 chan U) chan Pair[T, U] {
+	zipped := make(chan Pair[T, U])
+	go func() {
+		t, ok1 := <-chan1
+		u, ok2 := <-chan2
+		for ok1 && ok2 {
+			zipped <- Pair[T, U]{fst: t, snd: u}
+			t, ok1 = <-chan1
+			u, ok2 = <-chan2
+		}
+		close(zipped)
+	}()
+	return zipped
+}
+
+func UnZip[T, U any](channel chan Pair[T, U]) (chan T, chan U) {
+	ts := make(chan T)
+	us := make(chan U)
+	go func() {
+		for p := range channel {
+			ts <- p.fst
+			us <- p.snd
+		}
+		close(ts)
+		close(us)
+	}()
+	return ts, us
 }
 
 func Sorted[T constraints.Ordered](channel chan T) chan T {
