@@ -33,6 +33,16 @@ func FlatMap[T, U any](slice []T, f func(T) []U) []U {
 	return Flatten(Map(slice, f))
 }
 
+func Filter[T any](slice []T, p func(T) bool) []T {
+	var filtered []T
+	for _, t := range slice {
+		if p(t) {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
+}
+
 func FoldLeft[T any, U any](slice []T, f func(u U, t T) U, u U) U {
 	result := u
 	for _, t := range slice {
@@ -51,16 +61,6 @@ func FoldRight[T any, U any](slice []T, f func(t T, u U) U, u U) U {
 
 func Reduce[T any](slice []T, op func(t1, t2 T) T, initial T) T {
 	return FoldLeft(slice, op, initial)
-}
-
-func Filter[T any](slice []T, p func(T) bool) []T {
-	var filtered []T
-	for _, t := range slice {
-		if p(t) {
-			filtered = append(filtered, t)
-		}
-	}
-	return filtered
 }
 
 func Sum[M Monad](numbers []M) M {

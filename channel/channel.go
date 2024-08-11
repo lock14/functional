@@ -41,6 +41,19 @@ func FlatMap[T, U any](channel chan T, f func(T) chan U) chan U {
 	return Flatten(Map(channel, f))
 }
 
+func Filter[T any](channel chan T, p func(T) bool) chan T {
+	filtered := make(chan T)
+	go func() {
+		for t := range channel {
+			if p(t) {
+				filtered <- t
+			}
+		}
+		close(filtered)
+	}()
+	return filtered
+}
+
 func FoldLeft[T, U any](channel chan T, f func(u U, t T) U, u U) U {
 	result := u
 	for t := range channel {
@@ -59,19 +72,6 @@ func FoldRight[T, U any](channel chan T, f func(t T, u U) U, u U) U {
 
 func Reduce[T any](channel chan T, op func(t1, t2 T) T, initial T) T {
 	return FoldLeft(channel, op, initial)
-}
-
-func Filter[T any](channel chan T, p func(T) bool) chan T {
-	filtered := make(chan T)
-	go func() {
-		for t := range channel {
-			if p(t) {
-				filtered <- t
-			}
-		}
-		close(filtered)
-	}()
-	return filtered
 }
 
 func Sum[M Monad](elements chan M) M {
