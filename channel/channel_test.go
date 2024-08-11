@@ -27,9 +27,20 @@ func TestMap2(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := ToSlice(Map(FromSlice(tc.input), tc.mappingFunc))
+			input := FromSlice(tc.input)
+			mappedChan := Map(input, tc.mappingFunc)
+			got := ToSlice(mappedChan)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			// check that both channels are closed now
+			_, ok := <-input
+			if ok {
+				t.Error("expected input to be closed ")
+			}
+			_, ok = <-mappedChan
+			if ok {
+				t.Error("expected mappedChan to be closed ")
 			}
 		})
 	}
