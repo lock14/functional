@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestMap2(t *testing.T) {
+func TestMap(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
