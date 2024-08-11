@@ -4,6 +4,7 @@ import (
 	"errors"
 	"golang.org/x/exp/constraints"
 	"sort"
+	"sync/atomic"
 )
 
 // Monad represents any type that can use the `+` operator and whose zero
@@ -176,15 +177,23 @@ func ToSlice[T any](channel chan T) []T {
 	return slice
 }
 
-func Generate[T any](supplier func() T) chan T {
+func Generate[T any](supplier func() T) (chan T, func()) {
 	c := make(chan T)
-	// TODO: think about how to avoid this goroutine leaking
+	keepGoing := atomic.Bool{}
+	keepGoing.Store(true)
+	closeFunc := func() {
+		keepGoing.Store(false)
+		// read from the channel to unblock the goroutine so it can read the bool
+		// and close the channel.
+		_ = <-c
+	}
 	go func() {
-		for {
+		for keepGoing.Load() {
 			c <- supplier()
 		}
+		close(c)
 	}()
-	return c
+	return c, closeFunc
 }
 
 func Iterate[T any](seed T, hasNext func(T) bool, next func(T) T) chan T {
