@@ -169,7 +169,7 @@ func TestFilter(t *testing.T) {
 			want: nil,
 		},
 		{
-			name:  "map_many",
+			name:  "filter_many",
 			input: []int{1, 2, 3, 4, 5},
 			filterFunc: func(i int) bool {
 				return i%2 == 0
