@@ -4,7 +4,6 @@ import (
 	"errors"
 	"golang.org/x/exp/constraints"
 	"sort"
-	"sync"
 )
 
 // Monad represents any type that can use the `+` operator and whose zero
@@ -24,41 +23,6 @@ func Map[T any, U any](channel chan T, f func(T) U) chan U {
 	return mapped
 }
 
-func MapWithErr[T any, U any](channel chan T, f func(T) (U, error)) (chan U, chan error) {
-	mapped := make(chan U)
-	errs := make(chan error)
-	go func() {
-		for t := range channel {
-			u, err := f(t)
-			if err != nil {
-				errs <- err
-			} else {
-				mapped <- u
-			}
-		}
-		close(mapped)
-		close(errs)
-	}()
-	return mapped, errs
-}
-
-func ParallelMap[T any, U any](channel chan T, f func(T) U) chan U {
-	mapped := make(chan U)
-	go func() {
-		waitGroup := sync.WaitGroup{}
-		for t := range channel {
-			waitGroup.Add(1)
-			go func() {
-				defer waitGroup.Done()
-				mapped <- f(t)
-			}()
-		}
-		waitGroup.Wait()
-		close(mapped)
-	}()
-	return mapped
-}
-
 func Flatten[T any](channel chan chan T) chan T {
 	flat := make(chan T)
 	go func() {
@@ -67,6 +31,7 @@ func Flatten[T any](channel chan chan T) chan T {
 				flat <- t
 			}
 		}
+		close(flat)
 	}()
 	return flat
 }
@@ -103,43 +68,6 @@ func Filter[T any](channel chan T, p func(T) bool) chan T {
 				filtered <- t
 			}
 		}
-		close(filtered)
-	}()
-	return filtered
-}
-
-func FilterWithErr[T any](channel chan T, p func(T) (bool, error)) (chan T, chan error) {
-	filtered := make(chan T)
-	errs := make(chan error)
-	go func() {
-		for t := range channel {
-			ok, err := p(t)
-			if err != nil {
-				errs <- err
-			} else if ok {
-				filtered <- t
-			}
-		}
-		close(filtered)
-		close(errs)
-	}()
-	return filtered, errs
-}
-
-func ParallelFilter[T any](channel chan T, p func(T) bool) chan T {
-	filtered := make(chan T)
-	go func() {
-		waitGroup := sync.WaitGroup{}
-		for t := range channel {
-			waitGroup.Add(1)
-			go func() {
-				defer waitGroup.Done()
-				if p(t) {
-					filtered <- t
-				}
-			}()
-		}
-		waitGroup.Wait()
 		close(filtered)
 	}()
 	return filtered
@@ -208,6 +136,7 @@ func ToSlice[T any](channel chan T) []T {
 
 func Generate[T any](supplier func() T) chan T {
 	c := make(chan T)
+	// TODO: think about how to avoid this goroutine leaking
 	go func() {
 		for {
 			c <- supplier()
@@ -227,9 +156,12 @@ func Iterate[T any](seed T, hasNext func(T) bool, next func(T) T) chan T {
 	return c
 }
 
-func Range[T constraints.Integer](end T) chan T {
-	var start T
-	return Iterate(start, func(t T) bool { return t < end }, func(t T) T { t++; return t })
+func Range[T constraints.Integer](startInclusive, endExclusive T) chan T {
+	return Iterate(startInclusive, func(t T) bool { return t < endExclusive }, func(t T) T { t++; return t })
+}
+
+func RangeClosed[T constraints.Integer](startInclusive, endInclusive T) chan T {
+	return Iterate(startInclusive, func(t T) bool { return t <= endInclusive }, func(t T) T { t++; return t })
 }
 
 func Limit[T any](channel chan T, max int64) chan T {
