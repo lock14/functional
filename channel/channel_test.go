@@ -1,8 +1,10 @@
 package channel
 
 import (
+	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -375,6 +377,139 @@ func TestReduce(t *testing.T) {
 	}
 }
 
+func TestSum(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		input []int
+		want  int
+	}{
+		{
+			name:  "sum_empty",
+			input: []int{},
+			want:  0,
+		},
+		{
+			name:  "sum_one",
+			input: []int{1},
+			want:  1,
+		},
+		{
+			name:  "sum_many",
+			input: []int{1, 2, 3},
+			want:  6,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			input := FromSlice(tc.input)
+			got := Sum(input)
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			// check that channel is closed now
+			_, ok := <-input
+			if ok {
+				t.Error("expected input to be closed ")
+			}
+		})
+	}
+}
+
+func TestJoinErrs(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		input []error
+		want  error
+	}{
+		{
+			name:  "join_empty",
+			input: []error{},
+			want:  nil,
+		},
+		{
+			name:  "join_one",
+			input: []error{fmt.Errorf("err1")},
+			want:  fmt.Errorf("err1"),
+		},
+		{
+			name:  "join_many",
+			input: []error{fmt.Errorf("err1"), fmt.Errorf("err2"), fmt.Errorf("err3")},
+			want:  fmt.Errorf("err1\nerr2\nerr3"),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			input := FromSlice(tc.input)
+			got := JoinErrs(input)
+			if diff := DiffErr(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			// check that channel is closed now
+			_, ok := <-input
+			if ok {
+				t.Error("expected input to be closed ")
+			}
+		})
+	}
+}
+
+func TestJoin(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		input []string
+		sep   string
+		want  string
+	}{
+		{
+			name:  "join_empty",
+			input: []string{},
+			sep:   ", ",
+			want:  "",
+		},
+		{
+			name:  "sum_one",
+			input: []string{"a"},
+			sep:   ", ",
+			want:  "a",
+		},
+		{
+			name:  "join_many",
+			input: []string{"a", "b", "c"},
+			sep:   ", ",
+			want:  "a, b, c",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			input := FromSlice(tc.input)
+			got := Join(input, tc.sep)
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			// check that channel is closed now
+			_, ok := <-input
+			if ok {
+				t.Error("expected input to be closed ")
+			}
+		})
+	}
+}
+
 type StatefulConsumer[T any] struct {
 	consumed []T
 }
@@ -446,4 +581,34 @@ func TestPeek(t *testing.T) {
 			}
 		})
 	}
+}
+
+func DiffErr(got error, want error) string {
+	if got == nil && want == nil {
+		return ""
+	}
+	if got == nil {
+		return fmt.Sprintf("got error <nil> but want an error containing %q", want)
+	}
+	if want == nil {
+		return fmt.Sprintf("got error %q but want an error <nil>", got)
+	}
+	if gotMsg, wantMsg := got.Error(), want.Error(); !strings.Contains(gotMsg, wantMsg) {
+		out := fmt.Sprintf("got error %q but want an error containing %q", gotMsg, want)
+
+		// For long strings that will be hard to visually diff, include a diff.
+		// Explanation of the &&'s and ||'s: if we're diffing a long error
+		// message against a short one, a detailed diff isn't needed. The
+		// difference will be obvious to the eye, and any extra message will
+		// just be clutter. So only show the extra diff if the messages are both
+		// long, or both multi-line.
+		const msgLen = 20 // chosen arbitrarily
+		bothAreLong := len(wantMsg) >= msgLen && len(gotMsg) >= msgLen
+		bothAreMultiline := strings.Contains(wantMsg, "\n") && strings.Contains(gotMsg, "\n")
+		if bothAreLong || bothAreMultiline {
+			out += fmt.Sprintf("; diff was (-got,+want):\n%s", cmp.Diff(gotMsg, want))
+		}
+		return out
+	}
+	return ""
 }
