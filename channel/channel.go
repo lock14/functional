@@ -317,22 +317,24 @@ func Of[T any](ts ...T) chan T {
 	return c
 }
 
-func Partition[T any](channel chan T, size int) chan []T {
-	partitioned := make(chan []T)
+func Partition[T any](channel chan T, size int) chan chan T {
+	partitioned := make(chan chan T)
 	go func() {
 		count := 0
-		slice := make([]T, 0, size)
+		partition := make(chan T)
 		for t := range channel {
 			if count == size {
-				partitioned <- slice
-				slice = make([]T, 0, size)
+				partitioned <- partition
+				close(partition)
+				partition = make(chan T)
 				count = 0
 			}
-			slice = append(slice, t)
+			partition <- t
 			count++
 		}
 		if count > 0 {
-			partitioned <- slice
+			partitioned <- partition
+			close(partition)
 		}
 		close(partitioned)
 	}()
