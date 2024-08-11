@@ -16,7 +16,22 @@ func TestMap2(t *testing.T) {
 		want        []string
 	}{
 		{
-			name:        "map_works",
+			name:  "map_empty",
+			input: []int{},
+			mappingFunc: func(i int) string {
+				t.Error("mapping function was called when it should not have been")
+				return ""
+			},
+			want: nil,
+		},
+		{
+			name:        "map_one",
+			input:       []int{1},
+			mappingFunc: strconv.Itoa,
+			want:        []string{"1"},
+		},
+		{
+			name:        "map_many",
 			input:       []int{1, 2, 3},
 			mappingFunc: strconv.Itoa,
 			want:        []string{"1", "2", "3"},
