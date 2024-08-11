@@ -200,3 +200,76 @@ func TestFilter(t *testing.T) {
 		})
 	}
 }
+
+type StatefulConsumer[T any] struct {
+	consumed []T
+}
+
+func (c *StatefulConsumer[T]) Consume(s T) {
+	c.consumed = append(c.consumed, s)
+}
+
+func (c *StatefulConsumer[T]) Consumed() []T {
+	return c.consumed
+}
+
+func TestPeek(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name              string
+		input             []int
+		statefuleConsumer *StatefulConsumer[int]
+		want              []int
+		wantConsumed      []int
+	}{
+		{
+			name:              "peek_empty",
+			input:             []int{},
+			statefuleConsumer: &StatefulConsumer[int]{},
+			want:              nil,
+			wantConsumed:      nil,
+		},
+		{
+			name:              "peek_one",
+			input:             []int{2},
+			statefuleConsumer: &StatefulConsumer[int]{},
+			want:              []int{2},
+			wantConsumed:      []int{2},
+		},
+		{
+			name:              "peek_many",
+			input:             []int{1, 2, 3, 4, 5},
+			statefuleConsumer: &StatefulConsumer[int]{},
+			want:              []int{1, 2, 3, 4, 5},
+			wantConsumed:      []int{1, 2, 3, 4, 5},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			input := FromSlice(tc.input)
+			peekedChan := Peek(input, tc.statefuleConsumer.Consume)
+			got := ToSlice(peekedChan)
+			// make sure peek didn't mutate the data
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			// make sure we consumed what we expected
+			if diff := cmp.Diff(tc.statefuleConsumer.Consumed(), tc.wantConsumed); diff != "" {
+				t.Errorf("unexpected result for consumed (-got, +want): %s", diff)
+			}
+			// check that both channels are closed now
+			_, ok := <-input
+			if ok {
+				t.Error("expected input to be closed ")
+			}
+			_, ok = <-peekedChan
+			if ok {
+				t.Error("expected peekedChan to be closed ")
+			}
+		})
+	}
+}
