@@ -133,3 +133,70 @@ func TestFlatMap(t *testing.T) {
 		})
 	}
 }
+
+func TestFilter(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		input      []int
+		filterFunc func(int) bool
+		want       []int
+	}{
+		{
+			name:  "filter_empty",
+			input: []int{},
+			filterFunc: func(i int) bool {
+				t.Error("filter function was called when it should not have been")
+				return true
+			},
+			want: nil,
+		},
+		{
+			name:  "filter_one_true",
+			input: []int{2},
+			filterFunc: func(i int) bool {
+				return i%2 == 0
+			},
+			want: []int{2},
+		},
+		{
+			name:  "filter_one_false",
+			input: []int{1},
+			filterFunc: func(i int) bool {
+				return i%2 == 0
+			},
+			want: nil,
+		},
+		{
+			name:  "map_many",
+			input: []int{1, 2, 3, 4, 5},
+			filterFunc: func(i int) bool {
+				return i%2 == 0
+			},
+			want: []int{2, 4},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			input := FromSlice(tc.input)
+			filteredChan := Filter(input, tc.filterFunc)
+			got := ToSlice(filteredChan)
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			// check that both channels are closed now
+			_, ok := <-input
+			if ok {
+				t.Error("expected input to be closed ")
+			}
+			_, ok = <-filteredChan
+			if ok {
+				t.Error("expected filteredChan to be closed ")
+			}
+		})
+	}
+}
