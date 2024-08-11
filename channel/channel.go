@@ -293,6 +293,7 @@ func Peek[T any](channel chan T, consumer func(T)) chan T {
 	go func() {
 		for t := range channel {
 			consumer(t)
+			c <- t
 		}
 		close(c)
 	}()
@@ -314,4 +315,26 @@ func Of[T any](ts ...T) chan T {
 		close(c)
 	}()
 	return c
+}
+
+func Partition[T any](channel chan T, size int) chan []T {
+	partitioned := make(chan []T)
+	go func() {
+		count := 0
+		slice := make([]T, 0, size)
+		for t := range channel {
+			if count == size {
+				partitioned <- slice
+				slice = make([]T, 0, size)
+				count = 0
+			}
+			slice = append(slice, t)
+			count++
+		}
+		if count > 0 {
+			partitioned <- slice
+		}
+		close(partitioned)
+	}()
+	return partitioned
 }

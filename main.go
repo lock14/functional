@@ -19,4 +19,5 @@ func main() {
 	fmt.Println(channel.ToSlice(channel.Zip(channel.Of(1, 2, 3), channel.Of("bob", "mary"))))
 	fmt.Println(channel.Join(channel.Of("[", "]"), channel.Join(channel.Of("bob", "mary", "jain"), ", ")))
 	fmt.Println(channel.Join(channel.Of("bob"), ", "))
+	fmt.Println(channel.ToSlice(channel.Partition(channel.Range(0, 10), 3)))
 }
