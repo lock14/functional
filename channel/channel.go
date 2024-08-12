@@ -117,9 +117,13 @@ func UnZip[T, U any](channel chan Pair[T, U]) (chan T, chan U) {
 	go func() {
 		for p := range channel {
 			ts <- p.fst
-			us <- p.snd
 		}
 		close(ts)
+	}()
+	go func() {
+		for p := range channel {
+			us <- p.snd
+		}
 		close(us)
 	}()
 	return ts, us
