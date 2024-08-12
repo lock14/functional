@@ -132,8 +132,10 @@ func Partition[T any](slice []T, size int) [][]T {
 			partition = make([]T, 0, size)
 			count = 0
 		}
-		partition = append(partition, t)
-		count++
+		if size > 0 {
+			partition = append(partition, t)
+			count++
+		}
 	}
 	if count > 0 {
 		partitioned = append(partitioned, partition)
