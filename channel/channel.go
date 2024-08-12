@@ -167,13 +167,11 @@ func Distinct[T comparable](channel chan T) chan T {
 }
 
 func FromSlice[T any](slice []T) chan T {
-	channel := make(chan T)
-	go func() {
-		for _, t := range slice {
-			channel <- t
-		}
-		close(channel)
-	}()
+	channel := make(chan T, len(slice))
+	for _, t := range slice {
+		channel <- t
+	}
+	close(channel)
 	return channel
 }
 
@@ -315,14 +313,7 @@ func ForEach[T any](channel chan T, consumer func(T)) {
 }
 
 func Of[T any](ts ...T) chan T {
-	c := make(chan T)
-	go func() {
-		for _, t := range ts {
-			c <- t
-		}
-		close(c)
-	}()
-	return c
+	return FromSlice(ts)
 }
 
 func Partition[T any](channel chan T, size int) chan chan T {
