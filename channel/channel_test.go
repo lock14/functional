@@ -647,6 +647,109 @@ func TestUnZip(t *testing.T) {
 	}
 }
 
+func TestSorted(t *testing.T) {
+	cases := []struct {
+		name  string
+		input []int
+		want  []int
+	}{
+		{
+			name:  "empty",
+			input: []int{},
+			want:  nil,
+		},
+		{
+			name:  "one",
+			input: []int{1},
+			want:  []int{1},
+		},
+		{
+			name:  "many_sorted",
+			input: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			want:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+		{
+			name:  "many_reverse_sorted",
+			input: []int{10, 9, 8, 7, 6, 5, 4, 3, 2, 1},
+			want:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+		{
+			name:  "many_unordered",
+			input: []int{2, 1, 3, 5, 10, 9, 6, 8, 4, 7},
+			want:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			input := FromSlice(tc.input)
+			sortedChan := Sorted(input)
+			got := ToSlice(sortedChan)
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			_, ok := <-input
+			if ok {
+				t.Error("expected input to be closed ")
+			}
+			_, ok = <-sortedChan
+			if ok {
+				t.Error("expected sortedChan to be closed ")
+			}
+
+		})
+	}
+}
+
+func TestDistinct(t *testing.T) {
+	cases := []struct {
+		name  string
+		input []int
+		want  []int
+	}{
+		{
+			name:  "empty",
+			input: []int{},
+			want:  nil,
+		},
+		{
+			name:  "one",
+			input: []int{1},
+			want:  []int{1},
+		},
+		{
+			name:  "many_distinct",
+			input: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			want:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+		{
+			name:  "many_duplicates",
+			input: []int{10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 9, 2, 3, 6, 1, 7, 4, 5, 8, 10, 3, 4, 7, 10, 9, 6, 8, 1, 5, 2},
+			want:  []int{10, 9, 8, 7, 6, 5, 4, 3, 2, 1},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			input := FromSlice(tc.input)
+			distinctChan := Distinct(input)
+			got := ToSlice(distinctChan)
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			_, ok := <-input
+			if ok {
+				t.Error("expected input to be closed ")
+			}
+			_, ok = <-distinctChan
+			if ok {
+				t.Error("expected distinctChan to be closed ")
+			}
+
+		})
+	}
+}
+
 type StatefulConsumer[T any] struct {
 	consumed []T
 }
