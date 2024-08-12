@@ -10,7 +10,6 @@ func IsNil[T any](t T) bool {
 	default:
 		return false
 	}
-
 }
 
 func NotNil[T any](t T) bool {
