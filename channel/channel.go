@@ -357,31 +357,40 @@ func Clone[T any](channel chan T) (chan T, chan T) {
 	go func() {
 		waitGroup1 := sync.WaitGroup{}
 		waitGroup2 := sync.WaitGroup{}
-		l1 := atomic.Int64{}
-		l2 := atomic.Int64{}
-		count := int64(0)
+		order1 := make(chan uint64, 1)
+		order2 := make(chan uint64, 1)
+		count := uint64(0)
 		for t := range channel {
 			waitGroup1.Add(1)
 			waitGroup2.Add(1)
-			order := count
-			go func() {
+			go func(order uint64) {
 				defer waitGroup1.Done()
-				for order != l1.Load() {
-					// spin
+				for {
+					o := <-order1
+					if o == order {
+						break
+					}
+					order1 <- o
 				}
 				c1 <- t
-				l1.Add(1)
-			}()
-			go func() {
+				order1 <- order + 1
+			}(count)
+			go func(order uint64) {
 				defer waitGroup2.Done()
-				for order != l2.Load() {
-					// spin
+				for {
+					o := <-order2
+					if o == order {
+						break
+					}
+					order2 <- o
 				}
 				c2 <- t
-				l2.Add(1)
-			}()
+				order2 <- order + 1
+			}(count)
 			count++
 		}
+		order1 <- 0
+		order2 <- 0
 		go func() {
 			waitGroup1.Wait()
 			close(c1)
