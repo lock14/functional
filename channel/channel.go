@@ -116,7 +116,7 @@ func UnZip[T, U any](channel chan Pair[T, U]) (chan T, chan U) {
 	ts := make(chan T)
 	us := make(chan U)
 	go func() {
-		c1, c2 := Duplicate(channel)
+		c1, c2 := Clone(channel)
 		go func() {
 			for p := range c1 {
 				ts <- p.Fst
@@ -351,7 +351,7 @@ func Partition[T any](channel chan T, size int) chan chan T {
 	return partitioned
 }
 
-func Duplicate[T any](channel chan T) (chan T, chan T) {
+func Clone[T any](channel chan T) (chan T, chan T) {
 	c1 := make(chan T)
 	c2 := make(chan T)
 	go func() {
