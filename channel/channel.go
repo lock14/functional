@@ -329,8 +329,10 @@ func Partition[T any](channel chan T, size int) chan chan T {
 				partition = make(chan T)
 				count = 0
 			}
-			partition <- t
-			count++
+			if count < size {
+				partition <- t
+				count++
+			}
 		}
 		if count > 0 {
 			partitioned <- partition
