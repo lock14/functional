@@ -510,6 +510,143 @@ func TestJoin(t *testing.T) {
 	}
 }
 
+func TestZip(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		leftInput  []int
+		rightInput []string
+		want       []Pair[int, string]
+	}{
+		{
+			name:       "both_empty",
+			leftInput:  []int{},
+			rightInput: []string{},
+			want:       nil,
+		},
+		{
+			name:       "left_empty",
+			leftInput:  []int{},
+			rightInput: []string{"bob", "mary", "jane"},
+			want:       nil,
+		},
+		{
+			name:       "right_empty",
+			leftInput:  []int{1, 2, 3},
+			rightInput: []string{},
+			want:       nil,
+		},
+		{
+			name:       "left_shorter",
+			leftInput:  []int{1},
+			rightInput: []string{"bob", "mary", "jane"},
+			want: []Pair[int, string]{
+				{Fst: 1, Snd: "bob"},
+			},
+		},
+		{
+			name:       "right_shorter",
+			leftInput:  []int{1, 2, 3},
+			rightInput: []string{"bob"},
+			want: []Pair[int, string]{
+				{Fst: 1, Snd: "bob"},
+			},
+		},
+		{
+			name:       "same_length",
+			leftInput:  []int{1, 2, 3},
+			rightInput: []string{"bob", "mary", "jane"},
+			want: []Pair[int, string]{
+				{Fst: 1, Snd: "bob"},
+				{Fst: 2, Snd: "mary"},
+				{Fst: 3, Snd: "jane"},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			leftInput := FromSlice(tc.leftInput)
+			rightInput := FromSlice(tc.rightInput)
+			zipped := Zip(leftInput, rightInput)
+			got := ToSlice(zipped)
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			// verify zip channel is closed
+			_, ok := <-zipped
+			if ok {
+				t.Error("expected zipped to be closed ")
+			}
+		})
+	}
+}
+
+func TestUnZip(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		input     []Pair[int, string]
+		wantLeft  []int
+		wantRight []string
+	}{
+		{
+			name:      "empty",
+			input:     []Pair[int, string]{},
+			wantLeft:  nil,
+			wantRight: nil,
+		},
+		{
+			name: "one",
+			input: []Pair[int, string]{
+				{Fst: 1, Snd: "bob"},
+			},
+			wantLeft:  []int{1},
+			wantRight: []string{"bob"},
+		},
+		{
+			name: "many",
+			input: []Pair[int, string]{
+				{Fst: 1, Snd: "bob"},
+				{Fst: 2, Snd: "mary"},
+				{Fst: 3, Snd: "jane"},
+			},
+			wantLeft:  []int{1, 2, 3},
+			wantRight: []string{"bob", "mary", "jane"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			input := FromSlice(tc.input)
+			unzippedLeft, unzippedRight := UnZip(input)
+			gotLeft, gotRight := ToSlice(unzippedLeft), ToSlice(unzippedRight)
+			if diff := cmp.Diff(gotLeft, tc.wantLeft); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			if diff := cmp.Diff(gotRight, tc.wantRight); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			_, ok := <-input
+			if ok {
+				t.Error("expected input to be closed ")
+			}
+			_, ok = <-unzippedLeft
+			if ok {
+				t.Error("expected unzippedLeft to be closed ")
+			}
+			_, ok = <-unzippedRight
+			if ok {
+				t.Error("expected unzippedRight to be closed ")
+			}
+		})
+	}
+}
+
 type StatefulConsumer[T any] struct {
 	consumed []T
 }

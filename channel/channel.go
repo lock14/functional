@@ -4,6 +4,7 @@ import (
 	"errors"
 	"golang.org/x/exp/constraints"
 	"sort"
+	"sync"
 	"sync/atomic"
 )
 
@@ -92,8 +93,8 @@ func Join[T ~string](strings chan T, sep T) T {
 }
 
 type Pair[T1, T2 any] struct {
-	fst T1
-	snd T2
+	Fst T1
+	Snd T2
 }
 
 func Zip[T, U any](chan1 chan T, chan2 chan U) chan Pair[T, U] {
@@ -102,7 +103,7 @@ func Zip[T, U any](chan1 chan T, chan2 chan U) chan Pair[T, U] {
 		t, ok1 := <-chan1
 		u, ok2 := <-chan2
 		for ok1 && ok2 {
-			zipped <- Pair[T, U]{fst: t, snd: u}
+			zipped <- Pair[T, U]{Fst: t, Snd: u}
 			t, ok1 = <-chan1
 			u, ok2 = <-chan2
 		}
@@ -115,16 +116,19 @@ func UnZip[T, U any](channel chan Pair[T, U]) (chan T, chan U) {
 	ts := make(chan T)
 	us := make(chan U)
 	go func() {
-		for p := range channel {
-			ts <- p.fst
-		}
-		close(ts)
-	}()
-	go func() {
-		for p := range channel {
-			us <- p.snd
-		}
-		close(us)
+		c1, c2 := Duplicate(channel)
+		go func() {
+			for p := range c1 {
+				ts <- p.Fst
+			}
+			close(ts)
+		}()
+		go func() {
+			for p := range c2 {
+				us <- p.Snd
+			}
+			close(us)
+		}()
 	}()
 	return ts, us
 }
@@ -345,4 +349,47 @@ func Partition[T any](channel chan T, size int) chan chan T {
 		close(partitioned)
 	}()
 	return partitioned
+}
+
+func Duplicate[T any](channel chan T) (chan T, chan T) {
+	c1 := make(chan T)
+	c2 := make(chan T)
+	go func() {
+		waitGroup1 := sync.WaitGroup{}
+		waitGroup2 := sync.WaitGroup{}
+		l1 := atomic.Int64{}
+		l2 := atomic.Int64{}
+		count := int64(0)
+		for t := range channel {
+			waitGroup1.Add(1)
+			waitGroup2.Add(1)
+			order := count
+			go func() {
+				defer waitGroup1.Done()
+				for order != l1.Load() {
+					// spin
+				}
+				c1 <- t
+				l1.Add(1)
+			}()
+			go func() {
+				defer waitGroup2.Done()
+				for order != l2.Load() {
+					// spin
+				}
+				c2 <- t
+				l2.Add(1)
+			}()
+			count++
+		}
+		go func() {
+			waitGroup1.Wait()
+			close(c1)
+		}()
+		go func() {
+			waitGroup2.Wait()
+			close(c2)
+		}()
+	}()
+	return c1, c2
 }
