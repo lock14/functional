@@ -6,6 +6,16 @@ import (
 )
 
 func main() {
+	c := make(chan int)
+	select {
+	case n := <-c:
+		fmt.Println("Received", n)
+	default:
+		fmt.Println("Nothing received")
+	}
+}
+
+func chanTest() {
 	items := channel.FromSlice([]int{1, 1, 2, 2, 3, 3, 4, 4})
 	distinct := channel.Distinct(items)
 	slice := channel.ToSlice(distinct)

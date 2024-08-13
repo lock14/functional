@@ -191,7 +191,7 @@ func Generate[T any](supplier func() T) (chan T, func()) {
 		keepGoing.Store(false)
 		// read from the channel to unblock the goroutine so it can read the bool
 		// and close the channel.
-		_ = <-c
+		_, _ = <-c
 	}
 	go func() {
 		for keepGoing.Load() {
