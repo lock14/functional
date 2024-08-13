@@ -3,16 +3,16 @@ package main
 import (
 	"fmt"
 	"github.com/lock14/functional/channel"
+	"math/rand"
+	"strconv"
 )
 
 func main() {
-	c := make(chan int)
-	select {
-	case n := <-c:
-		fmt.Println("Received", n)
-	default:
-		fmt.Println("Nothing received")
+	generator, cancel := channel.Generate(rand.Int)
+	for s := range channel.ParallelMap(channel.Limit(generator, 3), strconv.Itoa) {
+		fmt.Println(s)
 	}
+	cancel()
 }
 
 func chanTest() {

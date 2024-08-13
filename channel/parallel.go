@@ -1,16 +1,23 @@
 package channel
 
-import "sync"
+import (
+	"runtime"
+	"sync"
+)
 
 func ParallelMap[T, U any](channel chan T, f func(T) U) chan U {
 	mapped := make(chan U)
 	go func() {
+		concurrency := runtime.NumCPU()
 		waitGroup := sync.WaitGroup{}
-		for t := range channel {
+		for i := 0; i < concurrency; i++ {
+			// spawn worker
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
-				mapped <- f(t)
+				for t := range channel {
+					mapped <- f(t)
+				}
 			}()
 		}
 		waitGroup.Wait()
@@ -22,13 +29,17 @@ func ParallelMap[T, U any](channel chan T, f func(T) U) chan U {
 func ParallelFlatten[T any](channel chan chan T) chan T {
 	flat := make(chan T)
 	go func() {
+		concurrency := runtime.NumCPU()
 		waitGroup := sync.WaitGroup{}
-		for c := range channel {
+		for i := 0; i < concurrency; i++ {
+			// spawn worker
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
-				for t := range c {
-					flat <- t
+				for c := range channel {
+					for t := range c {
+						flat <- t
+					}
 				}
 			}()
 		}
@@ -45,13 +56,17 @@ func ParallelFlatMap[T, U any](channel chan T, f func(T) chan U) chan U {
 func ParallelFilter[T any](channel chan T, p func(T) bool) chan T {
 	filtered := make(chan T)
 	go func() {
+		concurrency := runtime.NumCPU()
 		waitGroup := sync.WaitGroup{}
-		for t := range channel {
+		for i := 0; i < concurrency; i++ {
+			// spawn worker
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
-				if p(t) {
-					filtered <- t
+				for t := range channel {
+					if p(t) {
+						filtered <- t
+					}
 				}
 			}()
 		}
