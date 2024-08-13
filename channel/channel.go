@@ -350,6 +350,8 @@ func Clone[T any](channel chan T) (chan T, chan T) {
 		waitGroup2 := sync.WaitGroup{}
 		order1 := make(chan uint64, 1)
 		order2 := make(chan uint64, 1)
+		order1 <- 0
+		order2 <- 0
 		count := uint64(0)
 		for t := range channel {
 			waitGroup1.Add(1)
@@ -380,8 +382,6 @@ func Clone[T any](channel chan T) (chan T, chan T) {
 			}(count)
 			count++
 		}
-		order1 <- 0
-		order2 <- 0
 		go func() {
 			waitGroup1.Wait()
 			close(c1)
