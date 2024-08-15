@@ -116,15 +116,15 @@ func UnZip[T, U any](channel chan Pair[T, U]) (chan T, chan U) {
 	ts := make(chan T)
 	us := make(chan U)
 	go func() {
-		c1, c2 := Clone(channel)
+		clones := Clone(channel, 2)
 		go func() {
-			for p := range c1 {
+			for p := range clones[0] {
 				ts <- p.Fst
 			}
 			close(ts)
 		}()
 		go func() {
-			for p := range c2 {
+			for p := range clones[1] {
 				us <- p.Snd
 			}
 			close(us)
@@ -342,54 +342,46 @@ func Partition[T any](channel chan T, size int) chan chan T {
 	return partitioned
 }
 
-func Clone[T any](channel chan T) (chan T, chan T) {
-	c1 := make(chan T)
-	c2 := make(chan T)
+func Clone[T any](channel chan T, numClones int) []chan T {
+	clones := make([]chan T, numClones)
+	for i := 0; i < numClones; i++ {
+		clones[i] = make(chan T)
+	}
 	go func() {
-		waitGroup1 := sync.WaitGroup{}
-		waitGroup2 := sync.WaitGroup{}
-		order1 := make(chan uint64, 1)
-		order2 := make(chan uint64, 1)
-		order1 <- 0
-		order2 <- 0
+		waitGroups := make([]*sync.WaitGroup, len(clones))
+		for i := 0; i < numClones; i++ {
+			waitGroups[i] = &sync.WaitGroup{}
+		}
+		orders := make([]chan uint64, len(clones))
+		for i := 0; i < numClones; i++ {
+			orders[i] = make(chan uint64, 1)
+			orders[i] <- 0
+		}
 		count := uint64(0)
 		for t := range channel {
-			waitGroup1.Add(1)
-			waitGroup2.Add(1)
-			go func(order uint64) {
-				defer waitGroup1.Done()
-				for {
-					o := <-order1
-					if o == order {
-						break
+			for i := 0; i < numClones; i++ {
+				waitGroups[i].Add(1)
+				go func(order uint64) {
+					defer waitGroups[i].Done()
+					for {
+						o := <-orders[i]
+						if o == order {
+							break
+						}
+						orders[i] <- o
 					}
-					order1 <- o
-				}
-				c1 <- t
-				order1 <- order + 1
-			}(count)
-			go func(order uint64) {
-				defer waitGroup2.Done()
-				for {
-					o := <-order2
-					if o == order {
-						break
-					}
-					order2 <- o
-				}
-				c2 <- t
-				order2 <- order + 1
-			}(count)
+					clones[i] <- t
+					orders[i] <- order + 1
+				}(count)
+			}
 			count++
 		}
-		go func() {
-			waitGroup1.Wait()
-			close(c1)
-		}()
-		go func() {
-			waitGroup2.Wait()
-			close(c2)
-		}()
+		for i := 0; i < numClones; i++ {
+			go func() {
+				waitGroups[i].Wait()
+				close(clones[i])
+			}()
+		}
 	}()
-	return c1, c2
+	return clones
 }
