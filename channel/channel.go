@@ -3,6 +3,7 @@ package channel
 import (
 	"errors"
 	"golang.org/x/exp/constraints"
+	"iter"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -384,4 +385,14 @@ func Clone[T any](channel chan T, numClones int) []chan T {
 		}
 	}()
 	return clones
+}
+
+func Stream[T any](seq iter.Seq[T]) chan T {
+	c := make(chan T)
+	go func() {
+		for t := range seq {
+			c <- t
+		}
+	}()
+	return c
 }
