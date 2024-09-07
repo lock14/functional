@@ -192,19 +192,8 @@ func Count[T any](itr iter.Seq[T]) int64 {
 	return Sum(Map(itr, func(t T) int64 { return 1 }))
 }
 
-func Concat[T any](itr1, itr2 iter.Seq[T]) iter.Seq[T] {
-	return func(yield func(T) bool) {
-		for t := range itr1 {
-			if !yield(t) {
-				break
-			}
-		}
-		for t := range itr2 {
-			if !yield(t) {
-				break
-			}
-		}
-	}
+func Concat[T any](itrs ...iter.Seq[T]) iter.Seq[T] {
+	return Flatten(slices.Values(itrs))
 }
 
 func Peek[T any](itr iter.Seq[T], consumer func(T)) iter.Seq[T] {
