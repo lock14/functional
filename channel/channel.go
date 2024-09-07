@@ -318,6 +318,7 @@ func Of[T any](ts ...T) chan T {
 }
 
 func Partition[T any](channel chan T, size int) chan chan T {
+	// TODO: Rewrite this function as it has unintuitive blocking behavior
 	partitioned := make(chan chan T)
 	go func() {
 		count := 0
