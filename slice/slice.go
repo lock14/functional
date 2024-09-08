@@ -3,6 +3,7 @@ package slice
 import (
 	"errors"
 	"golang.org/x/exp/constraints"
+	"iter"
 )
 
 // Monad represents any type that can use the `+` operator and whose zero
@@ -141,4 +142,14 @@ func Partition[T any](slice []T, size int) [][]T {
 		partitioned = append(partitioned, partition)
 	}
 	return partitioned
+}
+
+func Collect[T, U any](seq2 iter.Seq2[T, U]) ([]T, []U) {
+	var ts []T
+	var us []U
+	for t, u := range seq2 {
+		ts = append(ts, t)
+		us = append(us, u)
+	}
+	return ts, us
 }

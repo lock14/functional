@@ -114,8 +114,8 @@ func Zip[T, U any](itr1 iter.Seq[T], itr2 iter.Seq[U]) iter.Seq2[T, U] {
 }
 
 func UnZip[T, U any](itr iter.Seq2[T, U]) (iter.Seq[T], iter.Seq[U]) {
-	// TODO
-	return nil, nil
+	ts, us := slice.Collect(itr)
+	return slices.Values(ts), slices.Values(us)
 }
 
 func Sorted[T cmp.Ordered](itr iter.Seq[T]) iter.Seq[T] {
