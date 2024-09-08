@@ -63,11 +63,17 @@ func FoldLeft[T, U any](itr iter.Seq[T], f func(U, T) U, u U) U {
 }
 
 func FoldRight[T, U any](itr iter.Seq[T], f func(T, U) U, u U) U {
-	result := u
-	for t := range itr {
-		result = f(t, FoldRight[T, U](itr, f, u))
+	next, stop := iter.Pull(itr)
+	defer stop()
+	return foldRight(next, f, u)
+}
+
+func foldRight[T, U any](next func() (T, bool), f func(T, U) U, u U) U {
+	t, ok := next()
+	if ok {
+		return f(t, foldRight[T, U](next, f, u))
 	}
-	return result
+	return u
 }
 
 func Reduce[T any](itr iter.Seq[T], f func(T, T) T, t T) T {
@@ -90,7 +96,7 @@ func Join[T ~string](itr iter.Seq[T], sep T) T {
 		if first {
 			first = false
 		} else {
-			t += sep
+			result += sep
 		}
 		result += t
 	}
