@@ -142,6 +142,13 @@ func Distinct[T comparable](itr iter.Seq[T]) iter.Seq[T] {
 	}
 }
 
+func Generate[T any](supplier func() T) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for yield(supplier()) {
+		}
+	}
+}
+
 func Iterate[T any](seed T, hasNext func(T) bool, next func(T) T) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for cur := seed; hasNext(cur); cur = next(cur) {

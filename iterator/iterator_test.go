@@ -429,7 +429,7 @@ func TestJoin(t *testing.T) {
 			want:  "",
 		},
 		{
-			name:  "sum_one",
+			name:  "join_one",
 			input: []string{"a"},
 			sep:   ", ",
 			want:  "a",
@@ -661,6 +661,74 @@ func TestDistinct(t *testing.T) {
 			got := slices.Collect(distinctChan)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+		})
+	}
+}
+
+type StatefulSupplier struct {
+	state int
+}
+
+func (s *StatefulSupplier) Supply() int {
+	value := s.state
+	s.state++
+	return value
+}
+
+func (s *StatefulSupplier) NumCalls() int {
+	return s.state
+}
+
+func TestGenerate(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		supplier  *StatefulSupplier
+		numReads  int
+		want      []int
+		wantCalls int
+	}{
+		{
+			name:      "read_none",
+			supplier:  &StatefulSupplier{},
+			numReads:  0,
+			want:      nil,
+			wantCalls: 1,
+		},
+		{
+			name:      "read_one",
+			supplier:  &StatefulSupplier{},
+			numReads:  1,
+			want:      []int{0},
+			wantCalls: 2,
+		},
+		{
+			name:      "read_many",
+			supplier:  &StatefulSupplier{},
+			numReads:  10,
+			want:      []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+			wantCalls: 11,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			generator := Generate(tc.supplier.Supply)
+			var got []int
+			generator(func(i int) bool {
+				got = append(got, i)
+				return i != tc.numReads-1
+			})
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+			// we expect the difference in the number of calls and the 'expected' number
+			// of calls to either be 0 or 1, depending on how the go routines are scheduled
+			if diff := tc.wantCalls - tc.supplier.NumCalls(); diff < 0 || diff > 1 {
+				t.Errorf("unexpected number of calls: %d", diff)
 			}
 		})
 	}
