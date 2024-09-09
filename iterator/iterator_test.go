@@ -615,8 +615,8 @@ func TestSorted(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			input := slices.Values(tc.input)
-			sortedChan := Sorted(input)
-			got := slices.Collect(sortedChan)
+			sorted := Sorted(input)
+			got := slices.Collect(sorted)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -657,8 +657,8 @@ func TestDistinct(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			input := slices.Values(tc.input)
-			distinctChan := Distinct(input)
-			got := slices.Collect(distinctChan)
+			distinct := Distinct(input)
+			got := slices.Collect(distinct)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
