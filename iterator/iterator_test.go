@@ -725,6 +725,177 @@ func TestGenerate(t *testing.T) {
 	}
 }
 
+func TestIterate(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		seed    int
+		hasNext func(int) bool
+		next    func(int) int
+		want    []int
+	}{
+		{
+			name:    "count",
+			seed:    1,
+			hasNext: func(i int) bool { return i <= 10 },
+			next:    func(i int) int { return i + 1 },
+			want:    []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := slices.Collect(Iterate(tc.seed, tc.hasNext, tc.next))
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+		})
+	}
+}
+
+func TestRange(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		start int
+		end   int
+		want  []int
+	}{
+		{
+			name:  "0_to_9",
+			start: 0,
+			end:   10,
+			want:  []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := slices.Collect(Range(tc.start, tc.end))
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+		})
+	}
+}
+
+func TestRangeClosed(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		start int
+		end   int
+		want  []int
+	}{
+		{
+			name:  "1_to_10",
+			start: 1,
+			end:   10,
+			want:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := slices.Collect(RangeClosed(tc.start, tc.end))
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+		})
+	}
+}
+
+func TestLimit(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		input []int
+		limit int64
+		want  []int
+	}{
+		{
+			name:  "limit_less_than_size",
+			input: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			limit: 3,
+			want:  []int{1, 2, 3},
+		},
+		{
+			name:  "limit_equals_size",
+			input: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			limit: 10,
+			want:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+		{
+			name:  "limit_greater_than_size",
+			input: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			limit: 30,
+			want:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := slices.Collect(Limit(slices.Values(tc.input), tc.limit))
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+		})
+	}
+}
+
+func TestSkip(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		input []int
+		skip  int64
+		want  []int
+	}{
+		{
+			name:  "skip_less_than_size",
+			input: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			skip:  3,
+			want:  []int{4, 5, 6, 7, 8, 9, 10},
+		},
+		{
+			name:  "skip_equals_size",
+			input: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			skip:  10,
+			want:  nil,
+		},
+		{
+			name:  "skip_greater_than_size",
+			input: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			skip:  30,
+			want:  nil,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := slices.Collect(Skip(slices.Values(tc.input), tc.skip))
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected result (-got, +want): %s", diff)
+			}
+		})
+	}
+}
+
 type StatefulConsumer[T any] struct {
 	consumed []T
 }
