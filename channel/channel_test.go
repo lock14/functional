@@ -2,10 +2,11 @@ package channel
 
 import (
 	"fmt"
-	"github.com/google/go-cmp/cmp"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestMap(t *testing.T) {

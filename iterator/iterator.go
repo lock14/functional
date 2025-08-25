@@ -3,10 +3,11 @@ package iterator
 import (
 	"cmp"
 	"errors"
-	"github.com/lock14/functional/slice"
-	"golang.org/x/exp/constraints"
 	"iter"
 	"slices"
+
+	"github.com/lock14/functional/slice"
+	"golang.org/x/exp/constraints"
 )
 
 // Monad represents any type that can use the `+` operator and whose zero
@@ -19,7 +20,7 @@ func Map[T, U any](itr iter.Seq[T], f func(T) U) iter.Seq[U] {
 	return func(yield func(U) bool) {
 		for t := range itr {
 			if !yield(f(t)) {
-				break
+				return
 			}
 		}
 	}
@@ -27,11 +28,10 @@ func Map[T, U any](itr iter.Seq[T], f func(T) U) iter.Seq[U] {
 
 func Flatten[T any](itrs iter.Seq[iter.Seq[T]]) iter.Seq[T] {
 	return func(yield func(T) bool) {
-	Loop:
 		for itr := range itrs {
 			for t := range itr {
 				if !yield(t) {
-					break Loop
+					return
 				}
 			}
 		}
@@ -47,7 +47,7 @@ func Filter[T any](itr iter.Seq[T], p func(T) bool) iter.Seq[T] {
 		for t := range itr {
 			if p(t) {
 				if !yield(t) {
-					break
+					return
 				}
 			}
 		}
@@ -135,7 +135,7 @@ func Distinct[T comparable](itr iter.Seq[T]) iter.Seq[T] {
 			if _, ok := set[t]; !ok {
 				set[t] = struct{}{}
 				if !yield(t) {
-					break
+					return
 				}
 			}
 		}
@@ -153,7 +153,7 @@ func Iterate[T any](seed T, hasNext func(T) bool, next func(T) T) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for cur := seed; hasNext(cur); cur = next(cur) {
 			if !yield(cur) {
-				break
+				return
 			}
 		}
 	}
@@ -172,7 +172,7 @@ func Limit[T any](itr iter.Seq[T], max int64) iter.Seq[T] {
 		var count int64
 		for t := range itr {
 			if count == max || !yield(t) {
-				break
+				return
 			}
 			count++
 		}
@@ -185,7 +185,7 @@ func Skip[T any](itr iter.Seq[T], n int64) iter.Seq[T] {
 		for t := range itr {
 			if count >= n {
 				if !yield(t) {
-					break
+					return
 				}
 			}
 			count++
@@ -214,7 +214,7 @@ func Peek[T any](itr iter.Seq[T], consumer func(T)) iter.Seq[T] {
 		for t := range itr {
 			consumer(t)
 			if !yield(t) {
-				break
+				return
 			}
 		}
 	}

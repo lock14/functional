@@ -2,8 +2,9 @@ package slice
 
 import (
 	"errors"
-	"golang.org/x/exp/constraints"
 	"iter"
+
+	"golang.org/x/exp/constraints"
 )
 
 // Monad represents any type that can use the `+` operator and whose zero

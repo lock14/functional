@@ -2,14 +2,15 @@ package iterator
 
 import (
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/lock14/functional/slice"
 	"iter"
 	"maps"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/lock14/functional/slice"
 )
 
 func TestMap(t *testing.T) {

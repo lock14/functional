@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/lock14/functional/channel"
 	"math/rand"
 	"strconv"
+
+	"github.com/lock14/functional/channel"
 )
 
 func main() {
