@@ -3,7 +3,6 @@ package iterator
 import (
 	"fmt"
 	"iter"
-	"maps"
 	"slices"
 	"strconv"
 	"strings"
