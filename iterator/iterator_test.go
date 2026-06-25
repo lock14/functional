@@ -3,7 +3,6 @@ package iterator
 import (
 	"fmt"
 	"iter"
-	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -532,30 +531,30 @@ func TestUnZip(t *testing.T) {
 
 	cases := []struct {
 		name      string
-		input     map[int]string
+		input     []struct{ k int; v string }
 		wantLeft  []int
 		wantRight []string
 	}{
 		{
 			name:      "empty",
-			input:     map[int]string{},
+			input:     []struct{ k int; v string }{},
 			wantLeft:  nil,
 			wantRight: nil,
 		},
 		{
 			name: "one",
-			input: map[int]string{
-				1: "bob",
+			input: []struct{ k int; v string }{
+				{1, "bob"},
 			},
 			wantLeft:  []int{1},
 			wantRight: []string{"bob"},
 		},
 		{
 			name: "many",
-			input: map[int]string{
-				1: "bob",
-				2: "mary",
-				3: "jane",
+			input: []struct{ k int; v string }{
+				{1, "bob"},
+				{2, "mary"},
+				{3, "jane"},
 			},
 			wantLeft:  []int{1, 2, 3},
 			wantRight: []string{"bob", "mary", "jane"},
@@ -565,7 +564,13 @@ func TestUnZip(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			input := maps.All(tc.input)
+			input := func(yield func(int, string) bool) {
+				for _, kv := range tc.input {
+					if !yield(kv.k, kv.v) {
+						return
+					}
+				}
+			}
 			unzippedLeft, unzippedRight := UnZip(input)
 			gotLeft, gotRight := slices.Collect(unzippedLeft), slices.Collect(unzippedRight)
 			if diff := cmp.Diff(gotLeft, tc.wantLeft); diff != "" {

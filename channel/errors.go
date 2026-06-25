@@ -1,42 +1,78 @@
 package channel
 
-func MapWithErr[T, U any](channel chan T, f func(T) (U, error)) (chan U, chan error) {
+import (
+	"context"
+)
+
+func MapWithErr[T, U any](ctx context.Context, channel chan T, f func(T) (U, error)) (chan U, chan error) {
 	mapped := make(chan U)
 	errs := make(chan error)
 	go func() {
-		for t := range channel {
-			u, err := f(t)
-			if err != nil {
-				errs <- err
-			} else {
-				mapped <- u
+		defer close(mapped)
+		defer close(errs)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case t, ok := <-channel:
+				if !ok {
+					return
+				}
+				u, err := f(t)
+				if err != nil {
+					select {
+					case <-ctx.Done():
+						return
+					case errs <- err:
+					}
+				} else {
+					select {
+					case <-ctx.Done():
+						return
+					case mapped <- u:
+					}
+				}
 			}
 		}
-		close(mapped)
-		close(errs)
 	}()
 	return mapped, errs
 }
 
-func FlatMapWithErr[T, U any](channel chan T, f func(T) (chan U, error)) (chan U, chan error) {
-	channels, errs := MapWithErr(channel, f)
-	return Flatten(channels), errs
+func FlatMapWithErr[T, U any](ctx context.Context, channel chan T, f func(T) (chan U, error)) (chan U, chan error) {
+	channels, errs := MapWithErr(ctx, channel, f)
+	return Flatten(ctx, channels), errs
 }
 
-func FilterWithErr[T any](channel chan T, p func(T) (bool, error)) (chan T, chan error) {
+func FilterWithErr[T any](ctx context.Context, channel chan T, p func(T) (bool, error)) (chan T, chan error) {
 	filtered := make(chan T)
 	errs := make(chan error)
 	go func() {
-		for t := range channel {
-			ok, err := p(t)
-			if err != nil {
-				errs <- err
-			} else if ok {
-				filtered <- t
+		defer close(filtered)
+		defer close(errs)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case t, ok := <-channel:
+				if !ok {
+					return
+				}
+				ok2, err := p(t)
+				if err != nil {
+					select {
+					case <-ctx.Done():
+						return
+					case errs <- err:
+					}
+				} else if ok2 {
+					select {
+					case <-ctx.Done():
+						return
+					case filtered <- t:
+					}
+				}
 			}
 		}
-		close(filtered)
-		close(errs)
 	}()
 	return filtered, errs
 }

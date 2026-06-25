@@ -125,6 +125,9 @@ func Concat[T any](slice1, slice2 []T) []T {
 }
 
 func Partition[T any](slice []T, size int) [][]T {
+	if size <= 0 {
+		return [][]T{}
+	}
 	partitioned := make([][]T, 0, len(slice)/size+1)
 	count := 0
 	partition := make([]T, 0, size)

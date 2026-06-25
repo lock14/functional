@@ -1,6 +1,7 @@
 package channel
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -46,8 +47,8 @@ func TestMap(t *testing.T) {
 			t.Parallel()
 
 			input := FromSlice(tc.input)
-			mappedChan := Map(input, tc.mappingFunc)
-			got := ToSlice(mappedChan)
+			mappedChan := Map(context.Background(), input, tc.mappingFunc)
+			got := ToSlice(context.Background(), mappedChan)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -119,8 +120,8 @@ func TestFlatMap(t *testing.T) {
 			t.Parallel()
 
 			input := FromSlice(tc.input)
-			mappedChan := FlatMap(input, tc.mappingFunc)
-			got := ToSlice(mappedChan)
+			mappedChan := FlatMap(context.Background(), input, tc.mappingFunc)
+			got := ToSlice(context.Background(), mappedChan)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -186,8 +187,8 @@ func TestFilter(t *testing.T) {
 			t.Parallel()
 
 			input := FromSlice(tc.input)
-			filteredChan := Filter(input, tc.filterFunc)
-			got := ToSlice(filteredChan)
+			filteredChan := Filter(context.Background(), input, tc.filterFunc)
+			got := ToSlice(context.Background(), filteredChan)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -249,7 +250,7 @@ func TestFoldLeft(t *testing.T) {
 			t.Parallel()
 
 			input := FromSlice(tc.input)
-			got := FoldLeft(input, tc.foldingFunc, tc.initialValue)
+			got := FoldLeft(context.Background(), input, tc.foldingFunc, tc.initialValue)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -307,7 +308,7 @@ func TestFoldRight(t *testing.T) {
 			t.Parallel()
 
 			input := FromSlice(tc.input)
-			got := FoldRight(input, tc.foldingFunc, tc.initialValue)
+			got := FoldRight(context.Background(), input, tc.foldingFunc, tc.initialValue)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -365,7 +366,7 @@ func TestReduce(t *testing.T) {
 			t.Parallel()
 
 			input := FromSlice(tc.input)
-			got := Reduce(input, tc.reducerFunc, tc.initialValue)
+			got := Reduce(context.Background(), input, tc.reducerFunc, tc.initialValue)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -408,7 +409,7 @@ func TestSum(t *testing.T) {
 			t.Parallel()
 
 			input := FromSlice(tc.input)
-			got := Sum(input)
+			got := Sum(context.Background(), input)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -451,7 +452,7 @@ func TestJoinErrs(t *testing.T) {
 			t.Parallel()
 
 			input := FromSlice(tc.input)
-			got := JoinErrs(input)
+			got := JoinErrs(context.Background(), input)
 			if diff := DiffErr(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -498,7 +499,7 @@ func TestJoin(t *testing.T) {
 			t.Parallel()
 
 			input := FromSlice(tc.input)
-			got := Join(input, tc.sep)
+			got := Join(context.Background(), input, tc.sep)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -571,8 +572,8 @@ func TestZip(t *testing.T) {
 			t.Parallel()
 			leftInput := FromSlice(tc.leftInput)
 			rightInput := FromSlice(tc.rightInput)
-			zipped := Zip(leftInput, rightInput)
-			got := ToSlice(zipped)
+			zipped := Zip(context.Background(), leftInput, rightInput)
+			got := ToSlice(context.Background(), zipped)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -624,8 +625,8 @@ func TestUnZip(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			input := FromSlice(tc.input)
-			unzippedLeft, unzippedRight := UnZip(input)
-			gotLeft, gotRight := ToSlice(unzippedLeft), ToSlice(unzippedRight)
+			unzippedLeft, unzippedRight := UnZip(context.Background(), input)
+			gotLeft, gotRight := ToSlice(context.Background(), unzippedLeft), ToSlice(context.Background(), unzippedRight)
 			if diff := cmp.Diff(gotLeft, tc.wantLeft); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -686,8 +687,8 @@ func TestSorted(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			input := FromSlice(tc.input)
-			sortedChan := Sorted(input)
-			got := ToSlice(sortedChan)
+			sortedChan := Sorted(context.Background(), input)
+			got := ToSlice(context.Background(), sortedChan)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -737,8 +738,8 @@ func TestDistinct(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			input := FromSlice(tc.input)
-			distinctChan := Distinct(input)
-			got := ToSlice(distinctChan)
+			distinctChan := Distinct(context.Background(), input)
+			got := ToSlice(context.Background(), distinctChan)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
@@ -805,7 +806,8 @@ func TestGenerate(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			generator, cancel := Generate(tc.supplier.Supply)
+			ctx, cancel := context.WithCancel(context.Background())
+			generator := Generate(ctx, tc.supplier.Supply)
 			var got []int
 			for i := 0; i < tc.numReads; i++ {
 				got = append(got, <-generator)
@@ -819,9 +821,8 @@ func TestGenerate(t *testing.T) {
 			if diff := tc.wantCalls - tc.supplier.NumCalls(); diff < 0 || diff > 1 {
 				t.Errorf("unexpected number of calls: %d", diff)
 			}
-			_, ok := <-generator
-			if ok {
-				t.Error("expected supplier to be closed ")
+			for range generator {
+				// drain remaining items (at most 1 due to select race)
 			}
 		})
 	}
@@ -877,8 +878,8 @@ func TestPeek(t *testing.T) {
 			t.Parallel()
 
 			input := FromSlice(tc.input)
-			peekedChan := Peek(input, tc.statefulConsumer.Consume)
-			got := ToSlice(peekedChan)
+			peekedChan := Peek(context.Background(), input, tc.statefulConsumer.Consume)
+			got := ToSlice(context.Background(), peekedChan)
 			// make sure peek didn't mutate the data
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)

@@ -1,58 +1,101 @@
 package channel
 
 import (
+	"context"
 	"sync"
 )
 
-func ParallelMapWithErr[T, U any](channel chan T, f func(T) (U, error)) (chan U, chan error) {
+func ParallelMapWithErr[T, U any](ctx context.Context, workers int, channel chan T, f func(T) (U, error)) (chan U, chan error) {
 	mapped := make(chan U)
 	errs := make(chan error)
 	go func() {
-		waitGroup := sync.WaitGroup{}
-		for t := range channel {
-			waitGroup.Add(1)
+		defer close(mapped)
+		defer close(errs)
+		if workers <= 0 {
+			return
+		}
+		var wg sync.WaitGroup
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
 			go func() {
-				defer waitGroup.Done()
-				u, err := f(t)
-				if err != nil {
-					errs <- err
-				} else {
-					mapped <- u
+				defer wg.Done()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case t, ok := <-channel:
+						if !ok {
+							return
+						}
+						u, err := f(t)
+						if err != nil {
+							select {
+							case <-ctx.Done():
+								return
+							case errs <- err:
+							}
+						} else {
+							select {
+							case <-ctx.Done():
+								return
+							case mapped <- u:
+							}
+						}
+					}
 				}
 			}()
 		}
-		waitGroup.Wait()
-		close(mapped)
-		close(errs)
+		wg.Wait()
 	}()
 	return mapped, errs
 }
 
-func ParallelFlatMapWithErr[T, U any](channel chan T, f func(T) (chan U, error)) (chan U, chan error) {
-	channels, errs := ParallelMapWithErr(channel, f)
-	return ParallelFlatten(channels), errs
+func ParallelFlatMapWithErr[T, U any](ctx context.Context, workers int, channel chan T, f func(T) (chan U, error)) (chan U, chan error) {
+	channels, errs := ParallelMapWithErr(ctx, workers, channel, f)
+	return ParallelFlatten(ctx, workers, channels), errs
 }
 
-func ParallelFilterWithErr[T any](channel chan T, p func(T) (bool, error)) (chan T, chan error) {
+func ParallelFilterWithErr[T any](ctx context.Context, workers int, channel chan T, p func(T) (bool, error)) (chan T, chan error) {
 	filtered := make(chan T)
 	errs := make(chan error)
 	go func() {
-		waitGroup := sync.WaitGroup{}
-		for t := range channel {
-			waitGroup.Add(1)
+		defer close(filtered)
+		defer close(errs)
+		if workers <= 0 {
+			return
+		}
+		var wg sync.WaitGroup
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
 			go func() {
-				defer waitGroup.Done()
-				ok, err := p(t)
-				if err != nil {
-					errs <- err
-				} else if ok {
-					filtered <- t
+				defer wg.Done()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case t, ok := <-channel:
+						if !ok {
+							return
+						}
+						ok2, err := p(t)
+						if err != nil {
+							select {
+							case <-ctx.Done():
+								return
+							case errs <- err:
+							}
+						} else if ok2 {
+							select {
+							case <-ctx.Done():
+								return
+							case filtered <- t:
+							}
+						}
+					}
 				}
 			}()
 		}
-		waitGroup.Wait()
-		close(filtered)
-		close(errs)
+		wg.Wait()
 	}()
 	return filtered, errs
 }

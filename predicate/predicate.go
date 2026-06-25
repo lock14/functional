@@ -3,10 +3,14 @@ package predicate
 import "reflect"
 
 func IsNil[T any](t T) bool {
-	switch reflect.ValueOf(t).Type().Kind() {
+	v := reflect.ValueOf(t)
+	if !v.IsValid() {
+		return true
+	}
+	switch v.Type().Kind() {
 	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer,
 		reflect.UnsafePointer, reflect.Interface, reflect.Slice:
-		return reflect.ValueOf(t).IsNil()
+		return v.IsNil()
 	default:
 		return false
 	}
