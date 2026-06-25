@@ -1,66 +1,126 @@
 package channel
 
 import (
+	"context"
 	"sync"
 )
 
-func ParallelMap[T, U any](channel chan T, f func(T) U) chan U {
+func ParallelMap[T, U any](ctx context.Context, workers int, channel chan T, f func(T) U) chan U {
 	mapped := make(chan U)
 	go func() {
-		waitGroup := sync.WaitGroup{}
-		for t := range channel {
-			waitGroup.Add(1)
+		defer close(mapped)
+		if workers <= 0 {
+			return
+		}
+		var wg sync.WaitGroup
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
 			go func() {
-				defer waitGroup.Done()
-				mapped <- f(t)
+				defer wg.Done()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case t, ok := <-channel:
+						if !ok {
+							return
+						}
+						u := f(t)
+						select {
+						case <-ctx.Done():
+							return
+						case mapped <- u:
+						}
+					}
+				}
 			}()
 		}
-		waitGroup.Wait()
-		close(mapped)
+		wg.Wait()
 	}()
 	return mapped
 }
 
-func ParallelFlatten[T any](channel chan chan T) chan T {
+func ParallelFlatten[T any](ctx context.Context, workers int, channel chan chan T) chan T {
 	flat := make(chan T)
 	go func() {
-		waitGroup := sync.WaitGroup{}
-		for c := range channel {
+		defer close(flat)
+		if workers <= 0 {
+			return
+		}
+		var wg sync.WaitGroup
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
 			go func() {
-				for t := range c {
-					waitGroup.Add(1)
-					go func() {
-						defer waitGroup.Done()
-						flat <- t
-					}()
+				defer wg.Done()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case c, ok := <-channel:
+						if !ok {
+							return
+						}
+						for {
+							select {
+							case <-ctx.Done():
+								return
+							case t, ok2 := <-c:
+								if !ok2 {
+									goto nextChannel
+								}
+								select {
+								case <-ctx.Done():
+									return
+								case flat <- t:
+								}
+							}
+						}
+					nextChannel:
+					}
 				}
 			}()
 		}
-		waitGroup.Wait()
-		close(flat)
+		wg.Wait()
 	}()
 	return flat
 }
 
-func ParallelFlatMap[T, U any](channel chan T, f func(T) chan U) chan U {
-	return ParallelFlatten(ParallelMap(channel, f))
+func ParallelFlatMap[T, U any](ctx context.Context, workers int, channel chan T, f func(T) chan U) chan U {
+	return ParallelFlatten(ctx, workers, ParallelMap(ctx, workers, channel, f))
 }
 
-func ParallelFilter[T any](channel chan T, p func(T) bool) chan T {
+func ParallelFilter[T any](ctx context.Context, workers int, channel chan T, p func(T) bool) chan T {
 	filtered := make(chan T)
 	go func() {
-		waitGroup := sync.WaitGroup{}
-		for t := range channel {
-			waitGroup.Add(1)
+		defer close(filtered)
+		if workers <= 0 {
+			return
+		}
+		var wg sync.WaitGroup
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
 			go func() {
-				defer waitGroup.Done()
-				if p(t) {
-					filtered <- t
+				defer wg.Done()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case t, ok := <-channel:
+						if !ok {
+							return
+						}
+						if p(t) {
+							select {
+							case <-ctx.Done():
+								return
+							case filtered <- t:
+							}
+						}
+					}
 				}
 			}()
 		}
-		waitGroup.Wait()
-		close(filtered)
+		wg.Wait()
 	}()
 	return filtered
 }

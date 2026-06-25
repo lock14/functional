@@ -63,17 +63,8 @@ func FoldLeft[T, U any](itr iter.Seq[T], f func(U, T) U, u U) U {
 }
 
 func FoldRight[T, U any](itr iter.Seq[T], f func(T, U) U, u U) U {
-	next, stop := iter.Pull(itr)
-	defer stop()
-	return foldRight(next, f, u)
-}
-
-func foldRight[T, U any](next func() (T, bool), f func(T, U) U, u U) U {
-	t, ok := next()
-	if ok {
-		return f(t, foldRight[T, U](next, f, u))
-	}
-	return u
+	s := slices.Collect(itr)
+	return slice.FoldRight(s, f, u)
 }
 
 func Reduce[T any](itr iter.Seq[T], f func(T, T) T, t T) T {
@@ -225,5 +216,22 @@ func Of[T any](ts ...T) iter.Seq[T] {
 }
 
 func Partition[T any](itr iter.Seq[T], size int) iter.Seq[iter.Seq[T]] {
-	return slices.Values[[]iter.Seq[T]](slice.Map(slice.Partition(slices.Collect(itr), size), slices.Values))
+	return func(yield func(iter.Seq[T]) bool) {
+		if size <= 0 {
+			return
+		}
+		var chunk []T
+		for t := range itr {
+			chunk = append(chunk, t)
+			if len(chunk) == size {
+				if !yield(slices.Values(chunk)) {
+					return
+				}
+				chunk = nil
+			}
+		}
+		if len(chunk) > 0 {
+			yield(slices.Values(chunk))
+		}
+	}
 }
