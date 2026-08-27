@@ -530,20 +530,29 @@ func TestUnZip(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name      string
-		input     []struct{ k int; v string }
+		name  string
+		input []struct {
+			k int
+			v string
+		}
 		wantLeft  []int
 		wantRight []string
 	}{
 		{
-			name:      "empty",
-			input:     []struct{ k int; v string }{},
+			name: "empty",
+			input: []struct {
+				k int
+				v string
+			}{},
 			wantLeft:  nil,
 			wantRight: nil,
 		},
 		{
 			name: "one",
-			input: []struct{ k int; v string }{
+			input: []struct {
+				k int
+				v string
+			}{
 				{1, "bob"},
 			},
 			wantLeft:  []int{1},
@@ -551,7 +560,10 @@ func TestUnZip(t *testing.T) {
 		},
 		{
 			name: "many",
-			input: []struct{ k int; v string }{
+			input: []struct {
+				k int
+				v string
+			}{
 				{1, "bob"},
 				{2, "mary"},
 				{3, "jane"},

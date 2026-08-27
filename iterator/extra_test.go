@@ -8,8 +8,15 @@ func TestAllMatch(t *testing.T) {
 	if !AllMatch(Range(1, 4), func(i int) bool { return i < 10 }) {
 		t.Errorf("AllMatch failed (expected true)")
 	}
-	if AllMatch(Range(1, 4), func(i int) bool { return i < 2 }) {
+	var callCount int
+	if AllMatch(Range(1, 100), func(i int) bool {
+		callCount++
+		return i < 2
+	}) {
 		t.Errorf("AllMatch failed (expected false)")
+	}
+	if callCount != 2 {
+		t.Errorf("AllMatch did not short-circuit: expected 2 calls, got %d", callCount)
 	}
 }
 
@@ -19,6 +26,16 @@ func TestAnyMatch(t *testing.T) {
 	}
 	if AnyMatch(Range(1, 4), func(i int) bool { return i == 5 }) {
 		t.Errorf("AnyMatch failed (expected false)")
+	}
+	var callCount int
+	if !AnyMatch(Range(1, 100), func(i int) bool {
+		callCount++
+		return i == 2
+	}) {
+		t.Errorf("AnyMatch failed (expected true)")
+	}
+	if callCount != 2 {
+		t.Errorf("AnyMatch did not short-circuit: expected 2 calls, got %d", callCount)
 	}
 }
 
@@ -62,83 +79,84 @@ func TestPartition(t *testing.T) {
 	if len(slices) != 3 || len(slices[0]) != 2 || slices[2][0] != 5 {
 		t.Errorf("Partition failed: %v", slices)
 	}
-	
+
 	c2 := Partition(Range(1, 6), 0)
-	for range c2 {}
+	for range c2 {
+	}
 }
 
 func TestEarlyExits(t *testing.T) {
 	// Test early exit (yield returns false) to hit 100% on Map, Flatten, Filter, Iterate, Skip, Peek, Distinct
-	
+
 	var count int
 	// Map early exit
-	for _ = range Map(Range(1, 10), func(i int) int { return i * 2 }) {
+	for range Map(Range(1, 10), func(i int) int { return i * 2 }) {
 		count++
 		if count == 2 {
 			break
 		}
 	}
-	
+
 	count = 0
 	// Flatten early exit
-	for _ = range Flatten(Of(Of(1, 2), Of(3, 4))) {
+	for range Flatten(Of(Of(1, 2), Of(3, 4))) {
 		count++
 		if count == 2 {
 			break
 		}
 	}
-	
+
 	count = 0
 	// Filter early exit
-	for _ = range Filter(Range(1, 10), func(i int) bool { return i%2 == 0 }) {
+	for range Filter(Range(1, 10), func(i int) bool { return i%2 == 0 }) {
 		count++
 		if count == 2 {
 			break
 		}
 	}
-	
+
 	count = 0
 	// Iterate early exit
-	for _ = range Iterate(1, func(i int) bool { return i < 10 }, func(i int) int { return i + 1 }) {
+	for range Iterate(1, func(i int) bool { return i < 10 }, func(i int) int { return i + 1 }) {
 		count++
 		if count == 2 {
 			break
 		}
 	}
-	
+
 	count = 0
 	// Skip early exit
-	for _ = range Skip(Range(1, 10), 2) {
+	for range Skip(Range(1, 10), 2) {
 		count++
 		if count == 2 {
 			break
 		}
 	}
-	
+
 	count = 0
 	// Peek early exit
-	for _ = range Peek(Range(1, 10), func(i int) {}) {
+	for range Peek(Range(1, 10), func(i int) {}) {
 		count++
 		if count == 2 {
 			break
 		}
 	}
-	
+
 	count = 0
 	// Distinct early exit
-	for _ = range Distinct(Of(1, 2, 2, 3, 4)) {
+	for range Distinct(Of(1, 2, 2, 3, 4)) {
 		count++
 		if count == 2 {
 			break
 		}
 	}
-	
+
 	count = 0
 	// Partition early exit
 	for chunk := range Partition(Range(1, 10), 2) {
 		count++
 		// internal chunk early exit
-		for _ = range chunk {
+		for range chunk {
 			break // inner exit
 		}
 		if count == 2 {

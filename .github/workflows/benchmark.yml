@@ -1,0 +1,105 @@
+name: Benchmark Regression Check
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history is required to compare against base branch
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Install benchstat and benchdiff
+        run: |
+          go install golang.org/x/perf/cmd/benchstat@latest
+          go install filippo.io/mostly-harmless/benchdiff@latest
+
+      - name: Determine changed packages
+        id: changed-pkgs
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+          else
+            BASE="HEAD~1"
+          fi
+          
+          GO_FILES=$(git diff --name-only $BASE...HEAD -- '*.go')
+          
+          if [ -z "$GO_FILES" ]; then
+            echo "No Go files changed. Skipping benchmarks."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "## 📊 Benchmark Regression Check" >> $GITHUB_STEP_SUMMARY
+            echo "No Go files changed. Benchmarks skipped." >> $GITHUB_STEP_SUMMARY
+          else
+            # Extract unique directories and prepend ./
+            PKGS=""
+            for dir in $(echo "$GO_FILES" | xargs -n1 dirname | sort -u); do
+              # Check if the directory existed in the base branch
+              if git rev-parse --verify "$BASE:$dir" >/dev/null 2>&1; then
+                PKGS="$PKGS ./$dir"
+              else
+                echo "Skipping new package $dir as it does not exist in $BASE"
+              fi
+            done
+            
+            # Trim whitespace
+            PKGS=$(echo $PKGS | xargs)
+            
+            if [ -z "$PKGS" ]; then
+              echo "No existing packages changed. Skipping benchmarks."
+              echo "skip=true" >> $GITHUB_OUTPUT
+              echo "## 📊 Benchmark Regression Check" >> $GITHUB_STEP_SUMMARY
+              echo "No existing package changes detected. Benchmarks skipped." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "Testing packages: $PKGS"
+              echo "pkgs=$PKGS" >> $GITHUB_OUTPUT
+              echo "skip=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Run benchdiff (Performance Regression Check)
+        if: steps.changed-pkgs.outputs.skip == 'false'
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+          else
+            BASE="HEAD~1"
+          fi
+
+          echo "Running benchdiff against $BASE on: ${{ steps.changed-pkgs.outputs.pkgs }}"
+          
+          # -count=6 allows benchstat to compute valid 95% confidence intervals
+          set -o pipefail
+          OUTPUT=$(benchdiff -base-ref $BASE -- -run '^$' -bench . -benchmem -count=6 -benchtime=500ms -timeout=30m ${{ steps.changed-pkgs.outputs.pkgs }})
+          EXIT_CODE=$?
+          
+          echo "$OUTPUT"
+
+          # Write Markdown summary to GitHub Actions Step Summary UI
+          {
+            echo "## 📊 Benchmark Regression Check"
+            echo ""
+            echo "**Base Ref:** \`$BASE\`"
+            echo "**Tested Packages:** \`${{ steps.changed-pkgs.outputs.pkgs }}\`"
+            echo ""
+            echo "<details><summary><b>Click to expand benchmark diff report</b></summary>"
+            echo ""
+            echo '```'
+            echo "$OUTPUT"
+            echo '```'
+            echo ""
+            echo "</details>"
+          } >> $GITHUB_STEP_SUMMARY
+
+          exit $EXIT_CODE
