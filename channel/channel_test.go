@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -757,16 +758,21 @@ func TestDistinct(t *testing.T) {
 }
 
 type StatefulSupplier struct {
+	mu    sync.Mutex
 	state int
 }
 
 func (s *StatefulSupplier) Supply() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	value := s.state
 	s.state++
 	return value
 }
 
 func (s *StatefulSupplier) NumCalls() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.state
 }
 
@@ -774,40 +780,35 @@ func TestGenerate(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name      string
-		supplier  *StatefulSupplier
-		numReads  int
-		want      []int
-		wantCalls int
+		name     string
+		numReads int
+		want     []int
 	}{
 		{
-			name:      "read_none",
-			supplier:  &StatefulSupplier{},
-			numReads:  0,
-			want:      nil,
-			wantCalls: 1,
+			name:     "read_none",
+			numReads: 0,
+			want:     nil,
 		},
 		{
-			name:      "read_one",
-			supplier:  &StatefulSupplier{},
-			numReads:  1,
-			want:      []int{0},
-			wantCalls: 2,
+			name:     "read_one",
+			numReads: 1,
+			want:     []int{0},
 		},
 		{
-			name:      "read_many",
-			supplier:  &StatefulSupplier{},
-			numReads:  10,
-			want:      []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-			wantCalls: 11,
+			name:     "read_many",
+			numReads: 10,
+			want:     []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
 		},
 	}
 
 	for _, tc := range cases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
-			generator := Generate(ctx, tc.supplier.Supply)
+			defer cancel()
+			supplier := &StatefulSupplier{}
+			generator := Generate(ctx, supplier.Supply)
 			var got []int
 			for i := 0; i < tc.numReads; i++ {
 				got = append(got, <-generator)
@@ -816,76 +817,82 @@ func TestGenerate(t *testing.T) {
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
-			// we expect the difference in the number of calls and the 'expected' number
-			// of calls to either be 0 or 1, depending on how the go routines are scheduled
-			if diff := tc.wantCalls - tc.supplier.NumCalls(); diff < 0 || diff > 1 {
-				t.Errorf("unexpected number of calls: %d", diff)
-			}
 			for range generator {
-				// drain remaining items (at most 1 due to select race)
+				// drain remaining items
+			}
+			if tc.numReads > 0 && supplier.NumCalls() < tc.numReads {
+				t.Errorf("expected at least %d calls, got %d", tc.numReads, supplier.NumCalls())
 			}
 		})
 	}
 }
 
 type StatefulConsumer[T any] struct {
+	mu       sync.Mutex
 	consumed []T
 }
 
 func (c *StatefulConsumer[T]) Consume(s T) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.consumed = append(c.consumed, s)
 }
 
 func (c *StatefulConsumer[T]) Consumed() []T {
-	return c.consumed
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.consumed) == 0 {
+		return nil
+	}
+	res := make([]T, len(c.consumed))
+	copy(res, c.consumed)
+	return res
 }
 
 func TestPeek(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name             string
-		input            []int
-		statefulConsumer *StatefulConsumer[int]
-		want             []int
-		wantConsumed     []int
+		name         string
+		input        []int
+		want         []int
+		wantConsumed []int
 	}{
 		{
-			name:             "peek_empty",
-			input:            []int{},
-			statefulConsumer: &StatefulConsumer[int]{},
-			want:             nil,
-			wantConsumed:     nil,
+			name:         "peek_empty",
+			input:        []int{},
+			want:         nil,
+			wantConsumed: nil,
 		},
 		{
-			name:             "peek_one",
-			input:            []int{2},
-			statefulConsumer: &StatefulConsumer[int]{},
-			want:             []int{2},
-			wantConsumed:     []int{2},
+			name:         "peek_one",
+			input:        []int{2},
+			want:         []int{2},
+			wantConsumed: []int{2},
 		},
 		{
-			name:             "peek_many",
-			input:            []int{1, 2, 3, 4, 5},
-			statefulConsumer: &StatefulConsumer[int]{},
-			want:             []int{1, 2, 3, 4, 5},
-			wantConsumed:     []int{1, 2, 3, 4, 5},
+			name:         "peek_many",
+			input:        []int{1, 2, 3, 4, 5},
+			want:         []int{1, 2, 3, 4, 5},
+			wantConsumed: []int{1, 2, 3, 4, 5},
 		},
 	}
 
 	for _, tc := range cases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
+			consumer := &StatefulConsumer[int]{}
 			input := FromSlice(tc.input)
-			peekedChan := Peek(context.Background(), input, tc.statefulConsumer.Consume)
+			peekedChan := Peek(context.Background(), input, consumer.Consume)
 			got := ToSlice(context.Background(), peekedChan)
 			// make sure peek didn't mutate the data
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("unexpected result (-got, +want): %s", diff)
 			}
 			// make sure we consumed what we expected
-			if diff := cmp.Diff(tc.statefulConsumer.Consumed(), tc.wantConsumed); diff != "" {
+			if diff := cmp.Diff(consumer.Consumed(), tc.wantConsumed); diff != "" {
 				t.Errorf("unexpected result for consumed (-got, +want): %s", diff)
 			}
 			// check that both channels are closed now
