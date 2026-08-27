@@ -17,7 +17,7 @@ func TestMapWithErr(t *testing.T) {
 	})
 	var mapped []int
 	var errList []error
-	
+
 	done := make(chan struct{})
 	go func() {
 		for e := range errs {
@@ -25,12 +25,12 @@ func TestMapWithErr(t *testing.T) {
 		}
 		close(done)
 	}()
-	
+
 	for i := range c {
 		mapped = append(mapped, i)
 	}
 	<-done
-	
+
 	if len(mapped) != 2 || len(errList) != 1 {
 		t.Errorf("MapWithErr failed: %v, %v", mapped, errList)
 	}
@@ -47,7 +47,7 @@ func TestFlatMapWithErr(t *testing.T) {
 	})
 	var mapped []int
 	var errList []error
-	
+
 	done := make(chan struct{})
 	go func() {
 		for e := range errs {
@@ -55,12 +55,12 @@ func TestFlatMapWithErr(t *testing.T) {
 		}
 		close(done)
 	}()
-	
+
 	for i := range c {
 		mapped = append(mapped, i)
 	}
 	<-done
-	
+
 	if len(mapped) != 2 || len(errList) != 1 {
 		t.Errorf("FlatMapWithErr failed: %v, %v", mapped, errList)
 	}
@@ -77,7 +77,7 @@ func TestFilterWithErr(t *testing.T) {
 	})
 	var filtered []int
 	var errList []error
-	
+
 	done := make(chan struct{})
 	go func() {
 		for e := range errs {
@@ -85,12 +85,12 @@ func TestFilterWithErr(t *testing.T) {
 		}
 		close(done)
 	}()
-	
+
 	for i := range c {
 		filtered = append(filtered, i)
 	}
 	<-done
-	
+
 	if len(filtered) != 1 || filtered[0] != 3 || len(errList) != 1 {
 		t.Errorf("FilterWithErr failed: %v, %v", filtered, errList)
 	}

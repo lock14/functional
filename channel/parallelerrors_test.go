@@ -18,7 +18,7 @@ func TestParallelMapWithErr(t *testing.T) {
 	})
 	var mapped []int
 	var errList []error
-	
+
 	done := make(chan struct{})
 	go func() {
 		for e := range errs {
@@ -26,17 +26,17 @@ func TestParallelMapWithErr(t *testing.T) {
 		}
 		close(done)
 	}()
-	
+
 	for i := range c {
 		mapped = append(mapped, i)
 	}
 	<-done
-	
+
 	sort.Ints(mapped)
 	if len(mapped) != 2 || len(errList) != 1 {
 		t.Errorf("ParallelMapWithErr failed: %v, %v", mapped, errList)
 	}
-	
+
 	c0, _ := ParallelMapWithErr(ctx, 0, Of(1), func(i int) (int, error) { return i, nil })
 	<-c0
 }
@@ -52,7 +52,7 @@ func TestParallelFlatMapWithErr(t *testing.T) {
 	})
 	var mapped []int
 	var errList []error
-	
+
 	done := make(chan struct{})
 	go func() {
 		for e := range errs {
@@ -60,12 +60,12 @@ func TestParallelFlatMapWithErr(t *testing.T) {
 		}
 		close(done)
 	}()
-	
+
 	for i := range c {
 		mapped = append(mapped, i)
 	}
 	<-done
-	
+
 	sort.Ints(mapped)
 	if len(mapped) != 2 || len(errList) != 1 {
 		t.Errorf("ParallelFlatMapWithErr failed: %v, %v", mapped, errList)
@@ -83,7 +83,7 @@ func TestParallelFilterWithErr(t *testing.T) {
 	})
 	var filtered []int
 	var errList []error
-	
+
 	done := make(chan struct{})
 	go func() {
 		for e := range errs {
@@ -91,16 +91,16 @@ func TestParallelFilterWithErr(t *testing.T) {
 		}
 		close(done)
 	}()
-	
+
 	for i := range c {
 		filtered = append(filtered, i)
 	}
 	<-done
-	
+
 	if len(filtered) != 1 || filtered[0] != 3 || len(errList) != 1 {
 		t.Errorf("ParallelFilterWithErr failed: %v, %v", filtered, errList)
 	}
-	
+
 	c0, _ := ParallelFilterWithErr(ctx, 0, Of(1), func(i int) (bool, error) { return true, nil })
 	<-c0
 }

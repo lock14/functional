@@ -5,6 +5,7 @@ import (
 	"sync"
 )
 
+// ParallelMap maps elements of channel concurrently using workers goroutines.
 func ParallelMap[T, U any](ctx context.Context, workers int, channel chan T, f func(T) U) chan U {
 	mapped := make(chan U)
 	go func() {
@@ -40,6 +41,7 @@ func ParallelMap[T, U any](ctx context.Context, workers int, channel chan T, f f
 	return mapped
 }
 
+// ParallelFlatten flattens channels received from channel concurrently using workers goroutines.
 func ParallelFlatten[T any](ctx context.Context, workers int, channel chan chan T) chan T {
 	flat := make(chan T)
 	go func() {
@@ -85,10 +87,12 @@ func ParallelFlatten[T any](ctx context.Context, workers int, channel chan chan 
 	return flat
 }
 
+// ParallelFlatMap maps elements to channels using f with workers goroutines and flattens the result.
 func ParallelFlatMap[T, U any](ctx context.Context, workers int, channel chan T, f func(T) chan U) chan U {
 	return ParallelFlatten(ctx, workers, ParallelMap(ctx, workers, channel, f))
 }
 
+// ParallelFilter filters elements concurrently using workers goroutines.
 func ParallelFilter[T any](ctx context.Context, workers int, channel chan T, p func(T) bool) chan T {
 	filtered := make(chan T)
 	go func() {

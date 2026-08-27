@@ -2,6 +2,7 @@ package channel
 
 import (
 	"context"
+	"sync"
 	"testing"
 )
 
@@ -61,8 +62,15 @@ func TestAllMatch(t *testing.T) {
 	if !AllMatch(ctx, Range(ctx, 1, 4), func(i int) bool { return i < 10 }) {
 		t.Errorf("AllMatch failed (expected true)")
 	}
-	if AllMatch(ctx, Range(ctx, 1, 4), func(i int) bool { return i < 2 }) {
+	var callCount int
+	if AllMatch(ctx, Range(ctx, 1, 100), func(i int) bool {
+		callCount++
+		return i < 2
+	}) {
 		t.Errorf("AllMatch failed (expected false)")
+	}
+	if callCount > 3 {
+		t.Errorf("AllMatch did not short-circuit: got %d calls", callCount)
 	}
 }
 
@@ -74,6 +82,48 @@ func TestAnyMatch(t *testing.T) {
 	}
 	if AnyMatch(ctx, Range(ctx, 1, 4), func(i int) bool { return i == 5 }) {
 		t.Errorf("AnyMatch failed (expected false)")
+	}
+	var callCount int
+	if !AnyMatch(ctx, Range(ctx, 1, 100), func(i int) bool {
+		callCount++
+		return i == 2
+	}) {
+		t.Errorf("AnyMatch failed (expected true)")
+	}
+	if callCount > 3 {
+		t.Errorf("AnyMatch did not short-circuit: got %d calls", callCount)
+	}
+}
+
+func TestClone(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	clones := Clone(ctx, Of(1, 2, 3), 3)
+	if len(clones) != 3 {
+		t.Fatalf("expected 3 clones, got %d", len(clones))
+	}
+
+	results := make([][]int, len(clones))
+	var wg sync.WaitGroup
+	for i, ch := range clones {
+		wg.Add(1)
+		go func(idx int, c chan int) {
+			defer wg.Done()
+			results[idx] = ToSlice(ctx, c)
+		}(i, ch)
+	}
+	wg.Wait()
+
+	for _, res := range results {
+		if len(res) != 3 || res[0] != 1 || res[1] != 2 || res[2] != 3 {
+			t.Errorf("unexpected clone content: %v", res)
+		}
+	}
+
+	c0 := Clone(ctx, Of(1), 0)
+	if len(c0) != 0 {
+		t.Errorf("expected 0 clones, got %d", len(c0))
 	}
 }
 
@@ -126,7 +176,7 @@ func TestPartition(t *testing.T) {
 	if len(slices) != 3 || len(slices[0]) != 2 || slices[2][0] != 5 {
 		t.Errorf("Partition failed: %v", slices)
 	}
-	
+
 	c2 := Partition(ctx, Range(ctx, 1, 6), 0)
 	<-c2 // wait for close
 }
@@ -149,7 +199,7 @@ func TestEarlyExits(t *testing.T) {
 	// Cancel immediately to test ctx.Done() branches
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	
+
 	// Just executing them with cancelled context to hit the ctx.Done() paths
 	<-Map(ctx, Of(1, 2), func(i int) int { return i })
 	<-Flatten(ctx, Of(Of(1)))
@@ -173,7 +223,7 @@ func TestEarlyExits(t *testing.T) {
 	<-Partition(ctx, Of(1), 1)
 	clones := Clone(ctx, Of(1), 1)
 	<-clones[0]
-	
+
 	seq := func(yield func(int) bool) { yield(1) }
 	<-Stream(ctx, seq)
 }
